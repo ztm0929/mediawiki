@@ -1,32 +1,29 @@
 # MediaWiki
 
-MediaWiki is a free and open-source wiki software package written in PHP. It
-serves as the platform for Wikipedia and the other Wikimedia projects, used
-by hundreds of millions of people each month. MediaWiki is localised in over
-350 languages and its reliability and robust feature set have earned it a large
-and vibrant community of third-party users and developers.
+MediaWiki 是一个使用PHP编程语言开发的自由开源软件包。它作为维基百科以及其他维基媒体项目的平台，每个月被数百万人广泛使用。MediaWiki 被翻译为多达350种语言，它的可靠性和强大的功能集为它收获了庞大的、充满活力的第三方用户和开发人员社区。
 
-MediaWiki is:
+MediaWiki 是：
 
 * feature-rich and extensible, both on-wiki and with hundreds of extensions;
-* scalable and suitable for both small and large sites;
-* simple to install, working on most hardware/software combinations; and
-* available in your language.
 
-For system requirements, installation, and upgrade details, see the files
-RELEASE-NOTES, INSTALL, and UPGRADE.
+* 功能丰富且可拓展的，
+* 伸缩性及适用性能够满足不同大小的站点；
+* 易于安装，能够在绝大多数硬件/软件组合的服务器上运作；
+* 并且可以使用你的语言。
 
-* Ready to get started?
+关于系统要求、安装步骤以及升级细节，请查看这几份文件RELEASE-NOTES、INSTALL和UPGRADE。
+
+* 准备好开始使用 MediaWiki 了吗？
   * https://www.mediawiki.org/wiki/Special:MyLanguage/Download
-* Setting up your local development environment?
+* 如何设置你的本地开发环境？
   * https://www.mediawiki.org/wiki/Local_development_quickstart
-* Looking for the technical manual?
+* 想要查看技术手册？
   * https://www.mediawiki.org/wiki/Special:MyLanguage/Manual:Contents
-* Seeking help from a person?
+* 想要寻求真人帮助？
   * https://www.mediawiki.org/wiki/Special:MyLanguage/Communication
-* Looking to file a bug report or a feature request?
+* 想要报告Bug或发起一个功能请求？
   * https://bugs.mediawiki.org/
-* Interested in helping out?
+* 对参与贡献感兴趣？
   * https://www.mediawiki.org/wiki/Special:MyLanguage/How_to_contribute
 
 MediaWiki is the result of global collaboration and cooperation. The CREDITS
