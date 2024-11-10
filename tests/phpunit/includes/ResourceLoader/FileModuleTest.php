@@ -936,7 +936,6 @@ class FileModuleTest extends ResourceLoaderTestCase {
 
 	/**
 	 * @covers \Wikimedia\DependencyStore\DependencyStore
-	 * @covers \Wikimedia\DependencyStore\KeyValueDependencyStore
 	 */
 	public function testIndirectDependencies() {
 		$context = $this->getResourceLoaderContext();
@@ -957,7 +956,6 @@ class FileModuleTest extends ResourceLoaderTestCase {
 
 	/**
 	 * @covers \Wikimedia\DependencyStore\DependencyStore
-	 * @covers \Wikimedia\DependencyStore\KeyValueDependencyStore
 	 */
 	public function testIndirectDependenciesUpdate() {
 		$context = $this->getResourceLoaderContext();
@@ -1000,10 +998,6 @@ class FileModuleTest extends ResourceLoaderTestCase {
 
 		$module->setName( $moduleInfo['name'] );
 		$module->setConfig( $context->getResourceLoader()->getConfig() );
-		$module->setDependencyAccessCallbacks(
-			[ $context->getResourceLoader(), 'loadModuleDependenciesInternal' ],
-			[ $context->getResourceLoader(), 'saveModuleDependenciesInternal' ]
-		);
 		$wrapper = TestingAccessWrapper::newFromObject( $module );
 		return $wrapper;
 	}

@@ -9,24 +9,70 @@ module.exports = exports = defineStore( 'block', () => {
 	const type = ref( mw.config.get( 'blockTypePreset' ) || 'sitewide' );
 	const expiry = ref( '' );
 	const partialOptions = ref( [ 'ipb-action-create' ] );
+	const pages = ref(
+		( mw.config.get( 'blockPageRestrictions' ) || '' )
+			.split( '\n' )
+			.filter( Boolean )
+	);
+	const namespaces = ref(
+		( mw.config.get( 'blockNamespaceRestrictions' ) || '' )
+			.split( '\n' )
+			.filter( Boolean )
+			.map( Number )
+	);
 	const reason = ref( 'other' );
 	const reasonOther = ref( mw.config.get( 'blockReasonOtherPreset' ) || '' );
+
 	const details = ref( mw.config.get( 'blockDetailsPreset' ) || [] );
-	// Disable the 'Hide username' checkbox if the block type is not sitewide with an 'infinite' expiry.
-	// eslint-disable-next-line arrow-body-style
-	const hideNameDisabled = computed( () => {
-		return type.value !== 'sitewide' || !mw.util.isInfinity( expiry.value );
+
+	const createAccount = ref( details.value.indexOf( 'wpCreateAccount' ) !== -1 );
+	const disableEmail = ref( details.value.indexOf( 'wpDisableEmail' ) !== -1 );
+	const disableEmailVisible = ref( mw.config.get( 'blockDisableEmailVisible' ) || false );
+	const disableUTEdit = ref( details.value.indexOf( 'wpDisableUTEdit' ) !== -1 );
+	const disableUTEditVisible = computed( () => {
+		const isVisible = mw.config.get( 'blockDisableUTEditVisible' ) || false;
+		const isPartial = type.value === 'partial';
+		const blocksUT = namespaces.value.indexOf( mw.config.get( 'wgNamespaceIds' ).user_talk ) !== -1;
+		return isVisible && ( !isPartial || ( isPartial && blocksUT ) );
 	} );
+
 	const additionalDetails = ref( mw.config.get( 'blockAdditionalDetailsPreset' ) || [] );
-	// Show confirm checkbox if 'Hide username' is selected or if the target user is the current user.
+
+	const autoBlock = ref( additionalDetails.value.indexOf( 'wpAutoBlock' ) !== -1 );
+	const autoBlockExpiry = mw.config.get( 'blockAutoblockExpiry' ) || '';
+	// eslint-disable-next-line arrow-body-style
+	const autoBlockVisible = computed( () => {
+		return !mw.util.isIPAddress( targetUser.value, true );
+	} );
+
+	const hideName = ref( additionalDetails.value.indexOf( 'wpHideName' ) !== -1 );
+	// Hide the 'Hide username' checkbox if the user doesn't have the hideuser right (this is passed from PHP),
+	// and the block is not sitewide and infinite.
+	const hideNameVisible = computed( () => {
+		const typeVal = type.value;
+		return mw.config.get( 'blockHideUser' ) &&
+			typeVal === 'sitewide' &&
+			mw.util.isInfinity( expiry.value );
+	} );
+
+	const watch = ref( additionalDetails.value.indexOf( 'wpWatch' ) !== -1 );
+
+	const hardBlock = ref( additionalDetails.value.indexOf( 'wpHardBlock' ) !== -1 );
+	// eslint-disable-next-line arrow-body-style
+	const hardBlockVisible = computed( () => {
+		return mw.util.isIPAddress( targetUser.value, true ) || false;
+	} );
+
+	// Show confirm checkbox if 'Hide username' is visible and selected, or if the target user is the current user.
 	// eslint-disable-next-line arrow-body-style
 	const confirmationRequired = computed( () => {
 		return targetUser.value === mw.config.get( 'wgUserName' ) || (
 			type.value === 'sitewide' &&
-			additionalDetails.value.indexOf( 'wpHideName' ) !== -1 &&
-			!hideNameDisabled.value
+			hideNameVisible.value &&
+			hideName.value
 		);
 	} );
+
 	const confirmationChecked = ref( false );
 
 	/**
@@ -69,34 +115,41 @@ module.exports = exports = defineStore( 'block', () => {
 			if ( partialOptions.value.indexOf( 'ipb-action-create' ) !== -1 ) {
 				actionRestrictions.push( 'create' );
 			}
-			params.actionRestrictions = actionRestrictions.join( '|' );
+			params.actionrestrictions = actionRestrictions.join( '|' );
+
+			if ( pages.value.length ) {
+				params.pagerestrictions = pages.value.join( '|' );
+			}
+			if ( namespaces.value.length ) {
+				params.namespacerestrictions = namespaces.value.join( '|' );
+			}
 		}
 
-		if ( details.value.indexOf( 'wpCreateAccount' ) !== -1 ) {
+		if ( createAccount.value ) {
 			params.nocreate = 1;
 		}
 
-		if ( details.value.indexOf( 'wpDisableEmail' ) !== -1 ) {
+		if ( disableEmail.value ) {
 			params.noemail = 1;
 		}
 
-		if ( details.value.indexOf( 'wpDisableUTEdit' ) !== -1 ) {
+		if ( !disableUTEdit.value ) {
 			params.allowusertalk = 1;
 		}
 
-		if ( additionalDetails.value.indexOf( 'wpAutoBlock' ) !== -1 ) {
+		if ( autoBlock.value ) {
 			params.autoblock = 1;
 		}
 
-		if ( additionalDetails.value.indexOf( 'wpHideName' ) !== -1 ) {
+		if ( hideName.value ) {
 			params.hidename = 1;
 		}
 
-		if ( additionalDetails.value.indexOf( 'wpWatch' ) !== -1 ) {
+		if ( watch.value ) {
 			params.watchuser = 1;
 		}
 
-		if ( additionalDetails.value.indexOf( 'wpHardBlock' ) !== -1 ) {
+		if ( hardBlock.value ) {
 			params.nocreate = 1;
 		}
 
@@ -113,11 +166,23 @@ module.exports = exports = defineStore( 'block', () => {
 		type,
 		expiry,
 		partialOptions,
+		pages,
+		namespaces,
 		reason,
 		reasonOther,
-		details,
-		hideNameDisabled,
-		additionalDetails,
+		createAccount,
+		disableEmail,
+		disableEmailVisible,
+		disableUTEdit,
+		disableUTEditVisible,
+		autoBlock,
+		autoBlockExpiry,
+		autoBlockVisible,
+		hideName,
+		hideNameVisible,
+		watch,
+		hardBlock,
+		hardBlockVisible,
 		confirmationRequired,
 		confirmationChecked,
 		doBlock

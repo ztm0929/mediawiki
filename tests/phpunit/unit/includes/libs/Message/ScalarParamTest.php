@@ -38,6 +38,10 @@ class ScalarParamTest extends MediaWikiUnitTestCase {
 				[ ParamType::TEXT, new MessageValue( 'key' ), ],
 				'<text><message key="key"></message></text>',
 			],
+			'T377912' => [
+				[ ParamType::PLAINTEXT, T377912TestCase::class ],
+				'<plaintext>' . T377912TestCase::class . '</plaintext>',
+			]
 		];
 	}
 
@@ -78,9 +82,8 @@ class ScalarParamTest extends MediaWikiUnitTestCase {
 	}
 
 	public function testConstruct_badValueNULL() {
-		$this->expectException( InvalidArgumentException::class );
-		$this->expectExceptionMessage(
-			'Scalar parameter must be a string, number, or MessageValue; got null'
+		$this->expectDeprecationAndContinue(
+			'/Using null as message parameter was deprecated/'
 		);
 		new ScalarParam( ParamType::TEXT, null );
 	}
@@ -88,7 +91,7 @@ class ScalarParamTest extends MediaWikiUnitTestCase {
 	public function testConstruct_badValueClass() {
 		$this->expectException( InvalidArgumentException::class );
 		$this->expectExceptionMessage(
-			'Scalar parameter must be a string, number, or MessageValue; got stdClass'
+			'Scalar parameter must be a string, number, Stringable, or MessageSpecifier; got stdClass'
 		);
 		new ScalarParam( ParamType::TEXT, new stdClass );
 	}

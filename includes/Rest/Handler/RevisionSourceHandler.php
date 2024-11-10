@@ -54,7 +54,7 @@ class RevisionSourceHandler extends SimpleHandler {
 		$outputMode = $this->getOutputMode();
 		switch ( $outputMode ) {
 			case 'restbase': // compatibility for restbase migration
-				$body = $this->contentHelper->constructRestbaseCompatibleMetadata();
+				$body = [ 'items' => [ $this->contentHelper->constructRestbaseCompatibleMetadata() ] ];
 				break;
 			case 'bare':
 				$revisionRecord = $this->contentHelper->getTargetRevision();
@@ -79,7 +79,7 @@ class RevisionSourceHandler extends SimpleHandler {
 		return $response;
 	}
 
-	protected function getResponseBodySchemaFileName(): ?string {
+	protected function getResponseBodySchemaFileName( string $method ): ?string {
 		// TODO: add fields based on the output mode to the schema
 		return 'includes/Rest/Handler/Schema/RevisionMetaData.json';
 	}

@@ -25,12 +25,12 @@
 
 namespace MediaWiki\Api;
 
+use MediaWiki\ChangeTags\ChangeTagsStore;
 use MediaWiki\CommentFormatter\CommentFormatter;
 use MediaWiki\Content\IContentHandlerFactory;
 use MediaWiki\Content\Renderer\ContentRenderer;
 use MediaWiki\Content\Transform\ContentTransformer;
 use MediaWiki\MainConfigNames;
-use MediaWiki\MediaWikiServices;
 use MediaWiki\ParamValidator\TypeDef\UserDef;
 use MediaWiki\Parser\ParserFactory;
 use MediaWiki\Revision\RevisionRecord;
@@ -55,31 +55,18 @@ class ApiQueryAllDeletedRevisions extends ApiQueryRevisionsBase {
 
 	private RevisionStore $revisionStore;
 	private NameTableStore $changeTagDefStore;
+	private ChangeTagsStore $changeTagsStore;
 	private NamespaceInfo $namespaceInfo;
 
-	/**
-	 * @param ApiQuery $query
-	 * @param string $moduleName
-	 * @param RevisionStore $revisionStore
-	 * @param IContentHandlerFactory $contentHandlerFactory
-	 * @param ParserFactory $parserFactory
-	 * @param SlotRoleRegistry $slotRoleRegistry
-	 * @param NameTableStore $changeTagDefStore
-	 * @param NamespaceInfo $namespaceInfo
-	 * @param ContentRenderer $contentRenderer
-	 * @param ContentTransformer $contentTransformer
-	 * @param CommentFormatter $commentFormatter
-	 * @param TempUserCreator $tempUserCreator
-	 * @param UserFactory $userFactory
-	 */
 	public function __construct(
 		ApiQuery $query,
-		$moduleName,
+		string $moduleName,
 		RevisionStore $revisionStore,
 		IContentHandlerFactory $contentHandlerFactory,
 		ParserFactory $parserFactory,
 		SlotRoleRegistry $slotRoleRegistry,
 		NameTableStore $changeTagDefStore,
+		ChangeTagsStore $changeTagsStore,
 		NamespaceInfo $namespaceInfo,
 		ContentRenderer $contentRenderer,
 		ContentTransformer $contentTransformer,
@@ -103,6 +90,7 @@ class ApiQueryAllDeletedRevisions extends ApiQueryRevisionsBase {
 		);
 		$this->revisionStore = $revisionStore;
 		$this->changeTagDefStore = $changeTagDefStore;
+		$this->changeTagsStore = $changeTagsStore;
 		$this->namespaceInfo = $namespaceInfo;
 	}
 
@@ -193,8 +181,7 @@ class ApiQueryAllDeletedRevisions extends ApiQueryRevisionsBase {
 
 		if ( $this->fld_tags ) {
 			$this->addFields( [
-				'ts_tags' => MediaWikiServices::getInstance()->getChangeTagsStore()
-					->makeTagSummarySubquery( 'archive' )
+				'ts_tags' => $this->changeTagsStore->makeTagSummarySubquery( 'archive' )
 			] );
 		}
 

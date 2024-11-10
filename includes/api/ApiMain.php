@@ -94,6 +94,7 @@ class ApiMain extends ApiBase {
 			'class' => ApiLogin::class,
 			'services' => [
 				'AuthManager',
+				'UserIdentityUtils'
 			],
 		],
 		'clientlogin' => [
@@ -644,7 +645,7 @@ class ApiMain extends ApiBase {
 			// for uselang=user (see T85635).
 		} else {
 			if ( $uselang === 'content' ) {
-				$uselang = $services->getContentLanguage()->getCode();
+				$uselang = $services->getContentLanguageCode()->toString();
 			}
 			$code = RequestContext::sanitizeLangCode( $uselang );
 			$derivativeContext->setLanguage( $code );
@@ -1907,10 +1908,20 @@ class ApiMain extends ApiBase {
 			$this->dieWithErrorOrDebug( [ 'apierror-mustbeposted', $this->mAction ] );
 		}
 
-		if ( $request->wasPosted() && !$request->getHeader( 'Content-Type' ) ) {
-			$this->addDeprecation(
-				'apiwarn-deprecation-post-without-content-type', 'post-without-content-type'
-			);
+		if ( $request->wasPosted() ) {
+			if ( !$request->getHeader( 'Content-Type' ) ) {
+				$this->addDeprecation(
+					'apiwarn-deprecation-post-without-content-type', 'post-without-content-type'
+				);
+			}
+			$contentLength = $request->getHeader( 'Content-Length' );
+			$maxPostSize = wfShorthandToInteger( ini_get( 'post_max_size' ), 0 );
+			if ( $maxPostSize && $contentLength > $maxPostSize ) {
+				$this->dieWithError(
+					[ 'apierror-http-contenttoolarge', Message::sizeParam( $maxPostSize ) ],
+					null, null, 413
+				);
+			}
 		}
 
 		// See if custom printer is used

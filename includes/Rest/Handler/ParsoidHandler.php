@@ -412,10 +412,7 @@ abstract class ParsoidHandler extends Handler {
 			$parameters
 		);
 
-		$stats = $this->siteConfig->prefixedStatsFactory();
-		if ( $stats ) {
-			$helper->setMetrics( $stats );
-		}
+		$helper->setMetrics( $this->siteConfig->prefixedStatsFactory() );
 
 		return $helper;
 	}
@@ -737,7 +734,10 @@ abstract class ParsoidHandler extends Handler {
 			$pb = $helper->getPageBundle();
 
 			// Handle custom offset requests as a pb2pb transform
-			if ( $attribs['offsetType'] !== 'byte' ) {
+			if (
+				$helper->isParsoidContent() &&
+				( $attribs['offsetType'] !== 'byte' )
+			) {
 				$parsoid = $this->newParsoid();
 				$pb = $parsoid->pb2pb(
 					$pageConfig,

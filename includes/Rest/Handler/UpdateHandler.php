@@ -164,7 +164,7 @@ class UpdateHandler extends EditHandler {
 
 		if ( $code === 'editconflict' ) {
 			$data = $this->getConflictData();
-			throw new LocalizedHttpException( $this->makeMessageValue( $msg ), 409, $data );
+			throw new LocalizedHttpException( MessageValue::newFromSpecifier( $msg ), 409, $data );
 		}
 
 		parent::throwHttpExceptionForActionModuleError( $msg, $statusCode );
@@ -252,5 +252,15 @@ class UpdateHandler extends EditHandler {
 
 		$json = ( $this->jsonDiffFunction )( $from->getText(), $to->getText(), 2 );
 		return FormatJson::decode( $json, true );
+	}
+
+	/**
+	 * This method specifies the JSON schema file for the response
+	 * body when updating an existing page.
+	 *
+	 * @return ?string The file path to the ExistingPage JSON schema.
+	 */
+	public function getResponseBodySchemaFileName( string $method ): ?string {
+		return 'includes/Rest/Handler/Schema/ExistingPage.json';
 	}
 }

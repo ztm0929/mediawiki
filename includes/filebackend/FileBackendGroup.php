@@ -23,8 +23,6 @@
 
 namespace MediaWiki\FileBackend;
 
-use FileBackendMultiWrite;
-use FSFileBackend;
 use InvalidArgumentException;
 use LogicException;
 use MediaWiki\Config\ServiceOptions;
@@ -36,6 +34,8 @@ use MediaWiki\Output\StreamFile;
 use MediaWiki\Status\Status;
 use Profiler;
 use Wikimedia\FileBackend\FileBackend;
+use Wikimedia\FileBackend\FileBackendMultiWrite;
+use Wikimedia\FileBackend\FSFileBackend;
 use Wikimedia\Mime\MimeAnalyzer;
 use Wikimedia\ObjectCache\BagOStuff;
 use Wikimedia\ObjectCache\WANObjectCache;
@@ -198,7 +198,8 @@ class FileBackendGroup {
 			$config = $this->config( $name );
 
 			$class = $config['class'];
-			if ( $class === FileBackendMultiWrite::class ) {
+			// Checking old alias for compatibility with unchanged config
+			if ( $class === FileBackendMultiWrite::class || $class === \FileBackendMultiWrite::class ) {
 				// @todo How can we test this? What's the intended use-case?
 				foreach ( $config['backends'] as $index => $beConfig ) {
 					if ( isset( $beConfig['template'] ) ) {

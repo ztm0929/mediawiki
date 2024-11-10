@@ -25,6 +25,7 @@ use MediaWiki\MainConfigNames;
 use MediaWiki\MediaWikiServices;
 use MediaWiki\Page\PageAssertionException;
 use MediaWiki\Page\PageIdentity;
+use MediaWiki\Parser\ParserCache;
 use MediaWiki\Parser\ParserOutput;
 use MediaWiki\Revision\RevisionRecord;
 use MediaWiki\Revision\RevisionRenderer;
@@ -278,9 +279,6 @@ class RefreshLinksJob extends Job {
 			return true;
 		}
 
-		// These can be fairly long-running jobs, while commitAndWaitForReplication
-		// releases primary snapshots, let the replica release their snapshot as well
-		$lbFactory->flushReplicaSnapshots( __METHOD__ );
 		// Parse during a fresh transaction round for better read consistency
 		$lbFactory->beginPrimaryChanges( __METHOD__ );
 		$output = $this->getParserOutput( $renderer, $parserCache, $page, $stats );

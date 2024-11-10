@@ -665,7 +665,6 @@ return [
 			'ResourceBasePath' => null,
 			'ResourceLoaderMaxage' => [
 			],
-			'ResourceLoaderUseObjectCacheForDeps' => true,
 			'ResourceLoaderDebug' => false,
 			'ResourceLoaderMaxQueryLength' => false,
 			'ResourceLoaderValidateJS' => true,
@@ -1348,6 +1347,8 @@ return [
 				],
 			],
 			'AutopromoteOnceLogInRC' => true,
+			'AutopromoteOnceRCExcludedGroups' => [
+			],
 			'AddGroups' => [
 			],
 			'RemoveGroups' => [
@@ -2837,6 +2838,7 @@ return [
 			'NonincludableNamespaces' => 'object',
 			'Autopromote' => 'object',
 			'AutopromoteOnce' => 'object',
+			'AutopromoteOnceRCExcludedGroups' => 'array',
 			'AddGroups' => 'object',
 			'RemoveGroups' => 'object',
 			'AvailableRights' => 'array',

@@ -25,6 +25,7 @@ use MediaWiki\Context\RequestContext;
 use MediaWiki\HookContainer\HookRunner;
 use MediaWiki\HookContainer\ProtectedHookAccessorTrait;
 use MediaWiki\Html\Html;
+use MediaWiki\Language\Language;
 use MediaWiki\Linker\Linker;
 use MediaWiki\Linker\LinkRenderer;
 use MediaWiki\MainConfigNames;
@@ -434,9 +435,7 @@ class ChangesList extends ContextSource {
 
 		return Html::element( $tag,
 			[ 'dir' => 'ltr', 'class' => $formattedSizeClass, 'title' => $formattedTotalSize ],
-			$formattedSize ) .
-			# There should be some character here otherwise mobile watchlist breaks, T376814
-			$lang->getDirMark();
+			$formattedSize );
 	}
 
 	/**
@@ -707,7 +706,7 @@ class ChangesList extends ContextSource {
 		// contain the full date (month, year) and adds consistency with Special:Contributions
 		// and other pages.
 		$separatorClass = $rc->watchlistExpiry ? 'mw-changeslist-separator' : 'mw-changeslist-separator--semicolon';
-		return Html::element( 'span', [ 'class' => $separatorClass ] ) . ' ' .
+		return Html::element( 'span', [ 'class' => $separatorClass ] ) . $this->message['word-separator'] .
 			'<span class="mw-changeslist-date mw-changeslist-time">' .
 			htmlspecialchars( $this->getLanguage()->userTime(
 				$rc->mAttribs['rc_timestamp'],
@@ -782,6 +781,7 @@ class ChangesList extends ContextSource {
 
 		return Html::openElement( 'span', [ 'class' => 'mw-changeslist-log-entry' ] )
 			. $formatter->getActionText()
+			. $this->message['word-separator']
 			. $comment
 			. $this->message['word-separator']
 			. $formatter->getActionLinks()
@@ -979,7 +979,7 @@ class ChangesList extends ContextSource {
 			)
 		);
 		$classes = array_merge( $classes, $newClasses );
-		$s .= ' ' . $tagSummary;
+		$s .= $this->message['word-separator'] . $tagSummary;
 	}
 
 	/**

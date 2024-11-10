@@ -37,15 +37,9 @@ class ApiClientLogin extends ApiBase {
 	private AuthManager $authManager;
 	private UrlUtils $urlUtils;
 
-	/**
-	 * @param ApiMain $main
-	 * @param string $action
-	 * @param AuthManager $authManager
-	 * @param UrlUtils $urlUtils
-	 */
 	public function __construct(
 		ApiMain $main,
-		$action,
+		string $action,
 		AuthManager $authManager,
 		UrlUtils $urlUtils
 	) {
@@ -69,6 +63,7 @@ class ApiClientLogin extends ApiBase {
 
 	public function execute() {
 		$params = $this->extractRequestParams();
+		$performer = $this->getUser();
 
 		$this->requireAtLeastOneParameter( $params, 'continue', 'returnurl' );
 
@@ -90,7 +85,7 @@ class ApiClientLogin extends ApiBase {
 			$res = AuthenticationResponse::newFail( $this->msg( 'userlogin-cannot-' . AuthManager::ACTION_LOGIN ) );
 			$this->getResult()->addValue( null, 'clientlogin',
 				$helper->formatAuthenticationResponse( $res ) );
-			$helper->logAuthenticationResult( 'login', $res );
+			$helper->logAuthenticationResult( 'login', $performer, $res );
 			return;
 		}
 
@@ -118,7 +113,7 @@ class ApiClientLogin extends ApiBase {
 
 		$this->getResult()->addValue( null, 'clientlogin',
 			$helper->formatAuthenticationResponse( $res ) );
-		$helper->logAuthenticationResult( 'login', $res );
+		$helper->logAuthenticationResult( 'login', $performer, $res );
 	}
 
 	public function isReadMode() {

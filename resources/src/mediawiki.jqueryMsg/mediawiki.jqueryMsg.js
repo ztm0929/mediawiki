@@ -576,7 +576,7 @@ Parser.prototype = {
 		function templateName() {
 			// see $wgLegalTitleChars
 			// not allowing : due to the need to catch "PLURAL:$1"
-			const templateNameRegex = makeRegexParser( /^[ !"$&'()*,./0-9;=?@A-Z^_`a-z~\x80-\xFF+-]+/ );
+			const templateNameRegex = makeRegexParser( /^#?[ !"$&'()*,./0-9;=?@A-Z^_`a-z~\x80-\xFF+-]+/ );
 			const result = templateNameRegex();
 			return result === null ? null : result.toString();
 		}
@@ -914,11 +914,10 @@ Parser.prototype = {
  * @param {Object.<string,string>} [magic]
  */
 function HtmlEmitter( language, magic ) {
-	const jmsg = this;
 	this.language = language;
 	Object.keys( magic || {} ).forEach( ( key ) => {
 		const val = magic[ key ];
-		jmsg[ key.toLowerCase() ] = function () {
+		this[ key.toLowerCase() ] = function () {
 			return val;
 		};
 	} );
@@ -931,7 +930,7 @@ function HtmlEmitter( language, magic ) {
 	 * @param {Array} replacements for $1, $2, ... $n
 	 * @return {any} single-string node or array of nodes suitable for jQuery appending
 	 */
-	this.emit = function ( node, replacements ) {
+	this.emit = ( node, replacements ) => {
 		switch ( typeof node ) {
 			case 'string':
 			case 'number':
@@ -941,10 +940,10 @@ function HtmlEmitter( language, magic ) {
 			case 'object': {
 				// node is an array of nodes
 				// eslint-disable-next-line no-jquery/no-map-util
-				const subnodes = $.map( node.slice( 1 ), ( n ) => jmsg.emit( n, replacements ) );
+				const subnodes = $.map( node.slice( 1 ), ( n ) => this.emit( n, replacements ) );
 				const operation = node[ 0 ].toLowerCase();
-				if ( typeof jmsg[ operation ] === 'function' ) {
-					return jmsg[ operation ]( subnodes, replacements );
+				if ( typeof this[ operation ] === 'function' ) {
+					return this[ operation ]( subnodes, replacements );
 				} else {
 					throw new Error( 'Unknown operation "' + operation + '"' );
 				}
@@ -1208,6 +1207,27 @@ HtmlEmitter.prototype = {
 			}
 		}
 		return appendWithoutParsing( $el.empty(), contents );
+	},
+
+	/**
+	 * Transform formal syntax
+	 *
+	 * @param {string[]} nodes List of nodes
+	 * @return {string|jQuery} selected (in)formal form according to the current language
+	 */
+	'#formal': function ( nodes ) {
+		const formalityIndex = this.language.getData(
+			mw.config.get( 'wgUserLanguage' ),
+			'formalityIndex'
+		);
+
+		if ( nodes.length === 0 ) {
+			return '';
+		} else if ( nodes.length === 1 ) {
+			return nodes[ 0 ];
+		}
+
+		return nodes[ formalityIndex ];
 	},
 
 	/**

@@ -1,7 +1,6 @@
 {
 	"@metadata": {
 		"authors": [
-			"Amire80",
 			"Bjargal",
 			"Elvonudinium",
 			"Korol Bumi",
@@ -2496,8 +2495,6 @@
 	"block-options": "Нэмэлтэ опцинууд:",
 	"block-options-description": "Эдэ опцинууд энэ хэрэглэгшые хинахадаа туһалха, тиигэбэл саашадаа асуудалнуудһаа һэргылхэ.",
 	"block-reason": "Шалтаг:",
-	"block-user-label": "Ямар хэрэглэгшые хааха һанаатайбта?",
-	"block-user-description": "Хэрэглэгшэ хэрэглэгшын нэрэ, IP хаяг, IP диапазон байжа болоно.",
 	"block-user-placeholder": "Хэрэглэгшэ бэшэжэ эхилхэ...",
 	"block-target": "Хабаадагшын нэрэ, IP-хаяг али IP-хаягуудай дэлисэ:",
 	"block-target-placeholder": "Хабаадагшын нэрэ, 1.1.1.42 али 1.1.1.42/16",
@@ -3919,7 +3916,6 @@
 	"renameuser-error-same-user": "Та хабаадагшада урид байһан тэрэл нэрыень үгэжэ шадахагүйт.",
 	"renameuser-error-temp-user": "Та $1 саг зуурын бүридхэлэй бэшэлгын нэрэ һэлгэжэ шадахагүйт.",
 	"renameuser-error-temp-user-reserved": "Та $1 хэрэглэжэ шадахагүйт. Тэрэ саг зуурын бүрэдхэлэй бэшэлгэнүүдтэ хэрэглэхын тула нөөсэдэ орхигдоһон.",
-	"renameuser-error-self-rename": "Та өөрөө өөрынгөө нэрэ һэлгэжэ шадахагүйт",
 	"renameusersuccess": "{{GENDER:$2|Хабаадагша}} «<nowiki>$1</nowiki>» нэрэнь һэлгэгдээ «<nowiki>$2</nowiki>».",
 	"renameuser-page-exists": "$1 Хуудаһан бии байна, тиимэһээ автомат аргаар дахин бэшэгдэхэ аргагүй.",
 	"renameuser-page-moved": "$1 Хуудаһан $2 болгогдожо нэрэнь һэлгэгдээ",

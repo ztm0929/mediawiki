@@ -98,7 +98,7 @@ class PageSourceHandler extends SimpleHandler {
 		$outputMode = $this->getOutputMode();
 		switch ( $outputMode ) {
 			case 'restbase': // compatibility for restbase migration
-				$body = $this->contentHelper->constructRestbaseCompatibleMetadata();
+				$body = [ 'items' => [ $this->contentHelper->constructRestbaseCompatibleMetadata() ] ];
 				break;
 			case 'bare':
 				$body = $this->contentHelper->constructMetadata();
@@ -165,5 +165,14 @@ class PageSourceHandler extends SimpleHandler {
 	 */
 	protected function hasRepresentation() {
 		return $this->contentHelper->hasContent();
+	}
+
+	/**
+	 * This method specifies the JSON schema file for the response body
+	 *
+	 * @return ?string The file path to the ExistingPage JSON schema.
+	 */
+	public function getResponseBodySchemaFileName( string $method ): ?string {
+		return 'includes/Rest/Handler/Schema/ExistingPage.json';
 	}
 }

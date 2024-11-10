@@ -117,8 +117,8 @@ abstract class Database implements Stringable, IDatabaseForOwner, IMaintainableD
 
 	/** @var float UNIX timestamp of the last server response */
 	private $lastPing = 0.0;
-	/** @var float|false UNIX timestamp of last write query */
-	private $lastWriteTime = false;
+	/** @var float|null UNIX timestamp of the last committed write */
+	private $lastWriteTime;
 	/** @var string|false The last PHP error from a query or connection attempt */
 	private $lastPhpError = false;
 
@@ -370,7 +370,7 @@ abstract class Database implements Stringable, IDatabaseForOwner, IMaintainableD
 	}
 
 	public function lastDoneWrites() {
-		return $this->lastWriteTime ?: false;
+		return $this->lastWriteTime;
 	}
 
 	/**
@@ -762,20 +762,16 @@ abstract class Database implements Stringable, IDatabaseForOwner, IMaintainableD
 			$this->sessionTempTables
 		);
 		// Get the transaction-aware SQL string used for profiling
-		$prefix = (
-			$this->replicationReporter->getTopologyRole() === self::ROLE_STREAMING_MASTER
-		) ? 'role-primary: ' : '';
-
-		// Start profile section
-		if ( $sql->getCleanedSql() ) {
-			$generalizedSql = $sql;
-			$ps = $this->profiler ? ( $this->profiler )( $sql->getCleanedSql() ) : null;
-		} else {
-			$generalizedSql = new GeneralizedSql( $sql->getSQL(), $prefix );
-			$ps = $this->profiler ? ( $this->profiler )( $generalizedSql->stringify() ) : null;
-		}
+		$generalizedSql = GeneralizedSql::newFromQuery(
+			$sql,
+			( $this->replicationReporter->getTopologyRole() === self::ROLE_STREAMING_MASTER )
+				? 'role-primary: '
+				: ''
+		);
 		// Add agent and calling method comments to the SQL
 		$cStatement = $this->makeCommentedSql( $sql->getSQL(), $fname );
+		// Start profile section
+		$ps = $this->profiler ? ( $this->profiler )( $generalizedSql->stringify() ) : null;
 		$startTime = microtime( true );
 
 		// Clear any overrides from a prior "query method". Note that this does not affect
@@ -801,7 +797,6 @@ abstract class Database implements Stringable, IDatabaseForOwner, IMaintainableD
 
 		if ( $status->res !== false ) {
 			if ( $isPermWrite ) {
-				$this->lastWriteTime = $startTime;
 				if ( $this->trxLevel() ) {
 					$this->transactionManager->transactionWritingIn(
 						$this->getServerName(),
@@ -814,6 +809,8 @@ abstract class Database implements Stringable, IDatabaseForOwner, IMaintainableD
 						$affectedRowCount,
 						$fname
 					);
+				} else {
+					$this->lastWriteTime = $endTime;
 				}
 			}
 		}
@@ -2386,7 +2383,7 @@ abstract class Database implements Stringable, IDatabaseForOwner, IMaintainableD
 		if ( !$this->trxLevel() ) {
 			$this->transactionManager->setTrxStatusToNone();
 			$this->transactionManager->clearPreEndCallbacks();
-			if ( $this->transactionManager->trxLevel() <= TransactionManager::STATUS_TRX_ERROR ) {
+			if ( $this->transactionManager->trxLevel() === TransactionManager::STATUS_TRX_ERROR ) {
 				$this->logger->info(
 					"$fname: acknowledged server-side transaction loss on {db_server}",
 					$this->getLogContext()
@@ -2475,7 +2472,7 @@ abstract class Database implements Stringable, IDatabaseForOwner, IMaintainableD
 			);
 		}
 
-		if ( $this->transactionManager->sessionStatus() <= TransactionManager::STATUS_SESS_ERROR ) {
+		if ( $this->transactionManager->sessionStatus() === TransactionManager::STATUS_SESS_ERROR ) {
 			// If the session state was already lost due to either an unacknowledged session
 			// state loss error (e.g. dropped connection) or an explicit connection close call,
 			// then there is nothing to do here. Note that in such cases, even temporary tables
@@ -2947,8 +2944,8 @@ abstract class Database implements Stringable, IDatabaseForOwner, IMaintainableD
 			// spam and confusing replacement of an original DBError with one about unlock().
 			// Unlock query will fail anyway; avoid possibly triggering errors in rollback()
 			if (
-				$this->transactionManager->sessionStatus() <= TransactionManager::STATUS_SESS_ERROR ||
-				$this->transactionManager->trxStatus() <= TransactionManager::STATUS_TRX_ERROR
+				$this->transactionManager->sessionStatus() === TransactionManager::STATUS_SESS_ERROR ||
+				$this->transactionManager->trxStatus() === TransactionManager::STATUS_TRX_ERROR
 			) {
 				return;
 			}

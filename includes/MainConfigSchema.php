@@ -5913,16 +5913,6 @@ class MainConfigSchema {
 	];
 
 	/**
-	 * Use the main stash instead of the module_deps table for indirect dependency tracking
-	 *
-	 * @deprecated since 1.43; This will be removed in 1.44
-	 * @since 1.35
-	 */
-	public const ResourceLoaderUseObjectCacheForDeps = [
-		'default' => true,
-	];
-
-	/**
 	 * The default debug mode (on/off) for of ResourceLoader requests.
 	 *
 	 * This will still be overridden when the debug URL parameter is used.
@@ -7439,7 +7429,7 @@ class MainConfigSchema {
 			'msg:proxyblocker', // For $wgProxyList and Special:Blockme (removed in 1.22)
 			'msg:sorbs', // For $wgEnableDnsBlacklist etc.
 			'msg:spambot_username', // Used by cleanupSpam.php
-			'msg:autochange-username', // Used by anon category RC entries (parser functions, Lua & purges)
+			'msg:autochange-username', // Used by anon category RC entries (removed in 1.44)
 		],
 		'type' => 'list',
 	];
@@ -8386,6 +8376,18 @@ class MainConfigSchema {
 	 */
 	public const AutopromoteOnceLogInRC = [
 		'default' => true,
+	];
+
+	/**
+	 * Defines a denylist of group names. One-shot autopromotions into these groups will not cause a
+	 * RecentChanges entry to be inserted even if AutopromoteOnceLogInRC is set, as long as they are the
+	 * only new groups the user was autopromoted to.
+	 *
+	 * @since 1.44
+	 */
+	public const AutopromoteOnceRCExcludedGroups = [
+		'default' => [],
+		'type' => 'array',
 	];
 
 	/**

@@ -104,6 +104,9 @@ class SpecialBlock extends FormSpecialPage {
 	/** @var bool */
 	protected bool $useCodex = false;
 
+	/** @var bool */
+	protected bool $useMultiblocks = false;
+
 	/**
 	 * @var array <mixed,mixed> An associative array used to pass vars to Codex form
 	 */
@@ -146,19 +149,33 @@ class SpecialBlock extends FormSpecialPage {
 		$this->namespaceInfo = $namespaceInfo;
 		$this->useCodex = $this->getConfig()->get( MainConfigNames::UseCodexSpecialBlock ) ||
 			$this->getRequest()->getBool( 'usecodex' );
+		$this->useMultiblocks = $this->getConfig()->get( MainConfigNames::EnableMultiBlocks ) ||
+			$this->getRequest()->getBool( 'multiblocks' );
 	}
 
+	public function getDescription(): Message {
+		return $this->msg( $this->useMultiblocks ? 'block-manage-blocks' : 'block' );
+	}
+
+	/**
+	 * @inheritDoc
+	 */
 	public function execute( $par ) {
 		parent::execute( $par );
 
 		if ( $this->useCodex ) {
+			$this->codexFormData[ 'blockEnableMultiblocks' ] = $this->useMultiblocks;
 			$this->codexFormData[ 'blockTargetUser' ] = $this->target instanceof UserIdentity ?
 				$this->target->getName() :
 				$this->target ?? null;
+			$this->codexFormData[ 'blockShowSuppressLog' ] = $this->getAuthority()->isAllowed( 'suppressionlog' );
 			$this->getOutput()->addJsConfigVars( $this->codexFormData );
 		}
 	}
 
+	/**
+	 * @inheritDoc
+	 */
 	public function doesWrites() {
 		return true;
 	}
@@ -263,6 +280,8 @@ class SpecialBlock extends FormSpecialPage {
 
 			$this->codexFormData[ 'blockDetailsPreset' ] = $blockDetailsPreset;
 			$this->codexFormData[ 'blockAdditionalDetailsPreset' ] = $blockAdditionalDetailsPreset;
+			$this->codexFormData[ 'blockPageRestrictions' ] = $request->getVal( 'wpPageRestrictions' );
+			$this->codexFormData[ 'blockNamespaceRestrictions' ] = $request->getVal( 'wpNamespaceRestrictions' );
 		}
 	}
 
@@ -294,11 +313,16 @@ class SpecialBlock extends FormSpecialPage {
 			) );
 
 			if ( $this->useCodex ) {
-				$this->codexFormData[ 'blockPreErrors' ] = array_map( 'strval', $this->preErrors );
+				$this->codexFormData[ 'blockPreErrors' ] = array_map( function ( $errMsg ) {
+					return $this->msg( $errMsg )->parse();
+				}, $this->preErrors );
 			}
 		}
 	}
 
+	/**
+	 * @inheritDoc
+	 */
 	protected function getDisplayFormat() {
 		return $this->useCodex ? 'codex' : 'ooui';
 	}
@@ -316,9 +340,6 @@ class SpecialBlock extends FormSpecialPage {
 		$user = $this->getUser();
 
 		$suggestedDurations = $this->getLanguage()->getBlockDurations();
-
-		$this->codexFormData[ 'blockEnableMultiblocks' ] = $conf->get( MainConfigNames::EnableMultiBlocks ) ||
-			$this->getRequest()->getBool( 'multiblocks' );
 
 		$a = [];
 
@@ -443,7 +464,7 @@ class SpecialBlock extends FormSpecialPage {
 				'section' => 'details',
 			];
 
-			$this->codexFormData[ 'blockAllowsEmailBan'] = true;
+			$this->codexFormData[ 'blockDisableEmailVisible'] = true;
 		}
 
 		if ( $blockAllowsUTEdit ) {
@@ -455,7 +476,7 @@ class SpecialBlock extends FormSpecialPage {
 				'section' => 'details',
 			];
 
-			$this->codexFormData[ 'blockAllowsUTEdit'] = true;
+			$this->codexFormData[ 'blockDisableUTEditVisible'] = true;
 		}
 
 		$defaultExpiry = $this->msg( 'ipb-default-expiry' )->inContentLanguage();
@@ -634,7 +655,8 @@ class SpecialBlock extends FormSpecialPage {
 			}
 
 			if ( !$block->isSitewide() ) {
-				$fields['EditingRestriction']['default'] = 'partial';
+				$fields['EditingRestriction']['default'] =
+					$this->codexFormData[ 'blockTypePreset' ] = 'partial';
 
 				$pageRestrictions = [];
 				$namespaceRestrictions = [];
@@ -650,9 +672,11 @@ class SpecialBlock extends FormSpecialPage {
 
 				// Sort the restrictions so they are in alphabetical order.
 				sort( $pageRestrictions );
-				$fields['PageRestrictions']['default'] = implode( "\n", $pageRestrictions );
+				$fields['PageRestrictions']['default'] =
+					$this->codexFormData[ 'blockPageRestrictions' ] = implode( "\n", $pageRestrictions );
 				sort( $namespaceRestrictions );
-				$fields['NamespaceRestrictions']['default'] = implode( "\n", $namespaceRestrictions );
+				$fields['NamespaceRestrictions']['default'] =
+					$this->codexFormData[ 'blockNamespaceRestrictions' ] = implode( "\n", $namespaceRestrictions );
 
 				if ( $this->getConfig()->get( MainConfigNames::EnablePartialActionBlocks ) ) {
 					$actionRestrictions = [];
@@ -1178,6 +1202,9 @@ class SpecialBlock extends FormSpecialPage {
 			->search( UserNamePrefixSearch::AUDIENCE_PUBLIC, $search, $limit, $offset );
 	}
 
+	/**
+	 * @inheritDoc
+	 */
 	protected function getGroupName() {
 		return 'users';
 	}

@@ -66,6 +66,8 @@ use MediaWiki\Config\GlobalVarConfig;
 use MediaWiki\Content\IContentHandlerFactory;
 use MediaWiki\Content\Renderer\ContentRenderer;
 use MediaWiki\Content\Transform\ContentTransformer;
+use MediaWiki\DomainEvent\DomainEventSink;
+use MediaWiki\DomainEvent\DomainEventSource;
 use MediaWiki\Edit\ParsoidOutputStash;
 use MediaWiki\EditPage\IntroMessageBuilder;
 use MediaWiki\EditPage\PreloadedContentBuilder;
@@ -121,7 +123,6 @@ use MediaWiki\Parser\Parsoid\Config\PageConfigFactory;
 use MediaWiki\Parser\Parsoid\Config\SiteConfig;
 use MediaWiki\Parser\Parsoid\HtmlTransformFactory;
 use MediaWiki\Parser\Parsoid\LintErrorChecker;
-use MediaWiki\Parser\Parsoid\ParsoidOutputAccess;
 use MediaWiki\Parser\Parsoid\ParsoidParserFactory;
 use MediaWiki\Password\PasswordFactory;
 use MediaWiki\Permissions\GrantsInfo;
@@ -412,10 +413,12 @@ class MediaWikiServices extends ServiceContainer {
 	 *        config of the old instance of MediaWikiServices will be re-used. If there
 	 *        was no previous instance, a new GlobalVarConfig object will be used to
 	 *        bootstrap the services.
-	 * @param string $quick Set this to "quick" to allow expensive resources to be re-used.
-	 * See SalvageableService for details.
+	 * @param string $mode May be one of:
+	 *   - quick: allow expensive resources to be re-used. See SalvageableService for details.
+	 *   - reset: discard expensive resources but reuse service wiring (default)
+	 *   - reload: discard expensive resources and reload the service wiring
 	 */
-	public static function resetGlobalInstance( ?Config $bootstrapConfig = null, $quick = '' ) {
+	public static function resetGlobalInstance( ?Config $bootstrapConfig = null, $mode = 'reset' ) {
 		if ( self::$instance === null ) {
 			// no global instance yet, nothing to reset
 			return;
@@ -433,9 +436,11 @@ class MediaWikiServices extends ServiceContainer {
 		$runner = new HookRunner( $oldInstance->getHookContainer() );
 		$runner->onMediaWikiServices( self::$instance );
 
-		self::$instance->importWiring( $oldInstance, [ 'BootstrapConfig' ] );
+		if ( $mode !== 'reload' ) {
+			self::$instance->importWiring( $oldInstance, [ 'BootstrapConfig' ] );
+		}
 
-		if ( $quick === 'quick' ) {
+		if ( $mode === 'quick' ) {
 			self::$instance->salvage( $oldInstance );
 		} else {
 			$oldInstance->destroy();
@@ -511,8 +516,8 @@ class MediaWikiServices extends ServiceContainer {
 
 	/**
 	 * Disables all storage layer services. After calling this, any attempt to access the
-	 * storage layer will result in an error. Use resetGlobalInstance() to restore normal
-	 * operation.
+	 * storage layer will result in an error. Use resetGlobalInstance() with $mode=reload
+	 * to restore normal operation.
 	 *
 	 * @since 1.40
 	 *
@@ -1090,6 +1095,22 @@ class MediaWikiServices extends ServiceContainer {
 	}
 
 	/**
+	 * @since 1.44
+	 * @unstable until 1.45
+	 */
+	public function getDomainEventSink(): DomainEventSink {
+		return $this->getService( 'DomainEventSink' );
+	}
+
+	/**
+	 * @since 1.44
+	 * @unstable until 1.45
+	 */
+	public function getDomainEventSource(): DomainEventSource {
+		return $this->getService( 'DomainEventSource' );
+	}
+
+	/**
 	 * @since 1.35
 	 */
 	public function getEmailer(): IEmailer {
@@ -1600,14 +1621,6 @@ class MediaWikiServices extends ServiceContainer {
 	 */
 	public function getParsoidDataAccess(): DataAccess {
 		return $this->getService( 'ParsoidDataAccess' );
-	}
-
-	/**
-	 * @since 1.39
-	 * @unstable
-	 */
-	public function getParsoidOutputAccess(): ParsoidOutputAccess {
-		return $this->getService( 'ParsoidOutputAccess' );
 	}
 
 	/**

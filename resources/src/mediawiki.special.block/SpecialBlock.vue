@@ -30,31 +30,30 @@
 			:form-submitted="formSubmitted"
 			@input="store.alreadyBlocked = false"
 		></user-lookup>
-		<target-active-blocks
+		<block-log
 			v-if="blockEnableMultiblocks"
-			:target-user="store.targetUser"
-		></target-active-blocks>
-		<target-block-log
-			:target-user="store.targetUser"
-		></target-block-log>
+			:key="`${submitCount}-active`"
+			block-log-type="active"
+		></block-log>
+		<block-log
+			:key="`${submitCount}-recent`"
+			block-log-type="recent"
+		></block-log>
+		<block-log
+			v-if="blockShowSuppressLog"
+			:key="`${submitCount}-suppress`"
+			block-log-type="suppress"
+		></block-log>
 		<block-type-field></block-type-field>
 		<expiry-field :form-submitted="formSubmitted"></expiry-field>
 		<reason-field
 			v-model:selected="store.reason"
 			v-model:other="store.reasonOther"
 		></reason-field>
-		<block-details-field
-			v-model="store.details"
-			:checkboxes="blockDetailsOptions"
-			:label="$i18n( 'block-details' ).text()"
-			:description="$i18n( 'block-details-description' ).text()"
-		></block-details-field>
-		<block-details-field
-			v-model="store.additionalDetails"
-			:checkboxes="additionalDetailsOptions"
-			:label="$i18n( 'block-options' ).text()"
-			:description="$i18n( 'block-options-description' ).text()"
-		></block-details-field>
+		<block-details-field>
+		</block-details-field>
+		<additional-details-field>
+		</additional-details-field>
 		<cdx-field v-if="store.confirmationRequired">
 			<cdx-checkbox
 				v-model="store.confirmationChecked"
@@ -82,23 +81,23 @@ const { storeToRefs } = require( 'pinia' );
 const { CdxButton, CdxCheckbox, CdxField, CdxMessage } = require( '@wikimedia/codex' );
 const useBlockStore = require( './stores/block.js' );
 const UserLookup = require( './components/UserLookup.vue' );
-const TargetActiveBlocks = require( './components/TargetActiveBlocks.vue' );
-const TargetBlockLog = require( './components/TargetBlockLog.vue' );
+const BlockLog = require( './components/BlockLog.vue' );
 const BlockTypeField = require( './components/BlockTypeField.vue' );
 const ExpiryField = require( './components/ExpiryField.vue' );
 const ReasonField = require( './components/ReasonField.vue' );
-const BlockDetailsField = require( './components/BlockDetailsOptions.vue' );
+const BlockDetailsField = require( './components/BlockDetailsField.vue' );
+const AdditionalDetailsField = require( './components/AdditionalDetailsField.vue' );
 
 module.exports = exports = defineComponent( {
 	name: 'SpecialBlock',
 	components: {
 		UserLookup,
-		TargetActiveBlocks,
-		TargetBlockLog,
+		BlockLog,
 		BlockTypeField,
 		ExpiryField,
 		ReasonField,
 		BlockDetailsField,
+		AdditionalDetailsField,
 		CdxButton,
 		CdxCheckbox,
 		CdxField,
@@ -107,6 +106,7 @@ module.exports = exports = defineComponent( {
 	setup() {
 		const store = useBlockStore();
 		const blockEnableMultiblocks = mw.config.get( 'blockEnableMultiblocks' ) || false;
+		const blockShowSuppressLog = mw.config.get( 'blockShowSuppressLog' ) || false;
 		const success = ref( false );
 		/**
 		 * Whether the form has been submitted. This is used to only show error states
@@ -117,48 +117,12 @@ module.exports = exports = defineComponent( {
 		const formSubmitted = ref( false );
 		const formDisabled = ref( false );
 		const messagesContainer = ref();
+		// Value to use for BlockLog component keys, so they reload after saving.
+		const submitCount = ref( 0 );
 		// eslint-disable-next-line arrow-body-style
 		const submitButtonMessage = computed( () => {
 			return mw.message( store.alreadyBlocked ? 'ipb-change-block' : 'ipbsubmit' ).text();
 		} );
-		const blockAllowsUTEdit = mw.config.get( 'blockAllowsUTEdit' ) || false;
-		const blockEmailBan = mw.config.get( 'blockAllowsEmailBan' ) || false;
-		const blockAutoblockExpiry = mw.config.get( 'blockAutoblockExpiry' );
-		const blockHideUser = mw.config.get( 'blockHideUser' ) || false;
-		const blockDetailsOptions = [
-			{
-				label: mw.message( 'ipbcreateaccount' ),
-				value: 'wpCreateAccount'
-			}
-		];
-
-		if ( blockEmailBan ) {
-			blockDetailsOptions.push( {
-				label: mw.message( 'ipbemailban' ),
-				value: 'wpDisableEmail'
-			} );
-		}
-
-		if ( blockAllowsUTEdit ) {
-			blockDetailsOptions.push( {
-				label: mw.message( 'ipb-disableusertalk' ),
-				value: 'wpDisableUTEdit'
-			} );
-		}
-
-		const additionalDetailsOptions = [ {
-			label: mw.message( 'ipbenableautoblock', blockAutoblockExpiry ),
-			value: 'wpAutoBlock',
-			disabled: false
-		} ];
-
-		if ( blockHideUser ) {
-			additionalDetailsOptions.push( {
-				label: mw.message( 'ipbhidename' ),
-				value: 'wpHideName',
-				class: 'mw-block-hideuser'
-			} );
-		}
 
 		// Show an error message if the target user is the current user.
 		const { formErrors, targetUser } = storeToRefs( store );
@@ -168,18 +132,7 @@ module.exports = exports = defineComponent( {
 			} else {
 				formErrors.value = [];
 			}
-		} );
-
-		additionalDetailsOptions.push( {
-			label: mw.message( 'ipbwatchuser' ),
-			value: 'wpWatch',
-			disabled: false
-		} );
-
-		additionalDetailsOptions.push( {
-			label: mw.message( 'ipb-hardblock' ),
-			value: 'wpHardBlock',
-			disabled: false
+			success.value = false;
 		} );
 
 		/**
@@ -203,6 +156,8 @@ module.exports = exports = defineComponent( {
 				store.doBlock()
 					.done( () => {
 						success.value = true;
+						formErrors.value = [];
+						formSubmitted.value = false;
 					} )
 					.fail( ( _, errorObj ) => {
 						formErrors.value = [ errorObj.error.info ];
@@ -211,6 +166,11 @@ module.exports = exports = defineComponent( {
 					.always( () => {
 						formDisabled.value = false;
 						messagesContainer.value.scrollIntoView( { behavior: 'smooth' } );
+						if ( success.value ) {
+							// Bump the submitCount (to re-render the logs) after scrolling
+							// because the log tables may change the length of the page.
+							submitCount.value++;
+						}
 					} );
 			} else {
 				// nextTick() needed to ensure error messages are rendered before scrolling.
@@ -233,11 +193,11 @@ module.exports = exports = defineComponent( {
 			messagesContainer,
 			formErrors,
 			success,
+			submitCount,
 			submitButtonMessage,
 			handleSubmit,
-			blockDetailsOptions,
-			additionalDetailsOptions,
-			blockEnableMultiblocks
+			blockEnableMultiblocks,
+			blockShowSuppressLog
 		};
 	}
 } );
@@ -273,5 +233,10 @@ module.exports = exports = defineComponent( {
 
 .mw-block-error {
 	margin-left: @spacing-75;
+}
+
+// Hide the log showing at the bottom of page.
+.mw-warning-with-logexcerpt {
+	display: none;
 }
 </style>

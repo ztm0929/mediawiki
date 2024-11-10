@@ -22,6 +22,7 @@
 
 namespace MediaWiki\Api;
 
+use MediaWiki\HookContainer\HookContainer;
 use MediaWiki\Interwiki\InterwikiLookup;
 use MediaWiki\Language\Language;
 use MediaWiki\Language\LanguageCode;
@@ -30,7 +31,6 @@ use MediaWiki\Languages\LanguageConverterFactory;
 use MediaWiki\Languages\LanguageFactory;
 use MediaWiki\Languages\LanguageNameUtils;
 use MediaWiki\MainConfigNames;
-use MediaWiki\MediaWikiServices;
 use MediaWiki\Parser\MagicWordFactory;
 use MediaWiki\Parser\ParserFactory;
 use MediaWiki\Registration\ExtensionRegistry;
@@ -65,6 +65,7 @@ class ApiQuerySiteinfo extends ApiQueryBase {
 
 	private UserOptionsLookup $userOptionsLookup;
 	private UserGroupManager $userGroupManager;
+	private HookContainer $hookContainer;
 	private LanguageConverterFactory $languageConverterFactory;
 	private LanguageFactory $languageFactory;
 	private LanguageNameUtils $languageNameUtils;
@@ -80,31 +81,12 @@ class ApiQuerySiteinfo extends ApiQueryBase {
 	private UrlUtils $urlUtils;
 	private TempUserConfig $tempUserConfig;
 
-	/**
-	 * @param ApiQuery $query
-	 * @param string $moduleName
-	 * @param UserOptionsLookup $userOptionsLookup
-	 * @param UserGroupManager $userGroupManager
-	 * @param LanguageConverterFactory $languageConverterFactory
-	 * @param LanguageFactory $languageFactory
-	 * @param LanguageNameUtils $languageNameUtils
-	 * @param Language $contentLanguage
-	 * @param NamespaceInfo $namespaceInfo
-	 * @param InterwikiLookup $interwikiLookup
-	 * @param ParserFactory $parserFactory
-	 * @param MagicWordFactory $magicWordFactory
-	 * @param SpecialPageFactory $specialPageFactory
-	 * @param SkinFactory $skinFactory
-	 * @param ILoadBalancer $loadBalancer
-	 * @param ReadOnlyMode $readOnlyMode
-	 * @param UrlUtils $urlUtils
-	 * @param TempUserConfig $tempUserConfig
-	 */
 	public function __construct(
 		ApiQuery $query,
-		$moduleName,
+		string $moduleName,
 		UserOptionsLookup $userOptionsLookup,
 		UserGroupManager $userGroupManager,
+		HookContainer $hookContainer,
 		LanguageConverterFactory $languageConverterFactory,
 		LanguageFactory $languageFactory,
 		LanguageNameUtils $languageNameUtils,
@@ -123,6 +105,7 @@ class ApiQuerySiteinfo extends ApiQueryBase {
 		parent::__construct( $query, $moduleName, 'si' );
 		$this->userOptionsLookup = $userOptionsLookup;
 		$this->userGroupManager = $userGroupManager;
+		$this->hookContainer = $hookContainer;
 		$this->languageConverterFactory = $languageConverterFactory;
 		$this->languageFactory = $languageFactory;
 		$this->languageNameUtils = $languageNameUtils;
@@ -1069,15 +1052,14 @@ class ApiQuerySiteinfo extends ApiQueryBase {
 	}
 
 	public function appendSubscribedHooks( $property ) {
-		$hookContainer = MediaWikiServices::getInstance()->getHookContainer();
-		$hookNames = $hookContainer->getHookNames();
+		$hookNames = $this->hookContainer->getHookNames();
 		sort( $hookNames );
 
 		$data = [];
 		foreach ( $hookNames as $name ) {
 			$arr = [
 				'name' => $name,
-				'subscribers' => $hookContainer->getHandlerDescriptions( $name ),
+				'subscribers' => $this->hookContainer->getHandlerDescriptions( $name ),
 			];
 
 			ApiResult::setArrayType( $arr['subscribers'], 'array' );

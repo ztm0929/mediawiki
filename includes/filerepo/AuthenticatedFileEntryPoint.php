@@ -26,12 +26,12 @@
 namespace MediaWiki\FileRepo;
 
 use File;
-use HTTPFileStreamer;
 use MediaWiki\HookContainer\HookRunner;
 use MediaWiki\Html\TemplateParser;
 use MediaWiki\MainConfigNames;
 use MediaWiki\MediaWikiEntryPoint;
 use MediaWiki\Title\Title;
+use Wikimedia\FileBackend\HTTPFileStreamer;
 
 class AuthenticatedFileEntryPoint extends MediaWikiEntryPoint {
 
@@ -223,9 +223,14 @@ class AuthenticatedFileEntryPoint extends MediaWikiEntryPoint {
 		$this->status( 403 );
 		$this->header( 'Cache-Control: no-cache' );
 		$this->header( 'Content-Type: text/html; charset=utf-8' );
+		$language = $context->getLanguage();
+		$lang = $language->getHtmlCode();
+		$this->header( "Content-Language: $lang" );
 		$templateParser = new TemplateParser();
 		$this->print(
 			$templateParser->processTemplate( 'ImageAuthForbidden', [
+				'dir' => $language->getDir(),
+				'lang' => $lang,
 				'msgHdr' => $msgHdr,
 				'detailMsg' => $detailMsg,
 			] )

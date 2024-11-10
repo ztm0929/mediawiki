@@ -229,6 +229,8 @@ $wgAutoloadClasses += [
 	'DummySessionProvider' => "$testDir/phpunit/mocks/session/DummySessionProvider.php",
 	'MediaWiki\\Tests\\Session\\DummySessionBackend' => "$testDir/phpunit/mocks/session/DummySessionBackend.php",
 	'MediaWiki\\Tests\\BrokenClass' => "$testDir/phpunit/mocks/BrokenClass.php",
+	'MediaWiki\\Tests\\BrokenClass2' => "$testDir/phpunit/mocks/BrokenClass2.php",
+	'MediaWiki\\Tests\\BrokenClass3' => "$testDir/phpunit/mocks/BrokenClass3.php",
 	'MediaWiki\\Tests\\MockDatabase' => "$testDir/phpunit/mocks/MockDatabase.php",
 	'MediaWiki\\Tests\\Unit\\DummyServicesTrait' => "$testDir/phpunit/mocks/DummyServicesTrait.php",
 	'MediaWiki\\Tests\\Unit\\FakeQqxMessageLocalizer' => "$testDir/phpunit/mocks/FakeQqxMessageLocalizer.php",
@@ -307,6 +309,7 @@ $wgAutoloadClasses += [
 	'Wikimedia\\Tests\\Message\\MessageSerializationTestTrait' => "$testDir/phpunit/unit/includes/libs/Message/MessageSerializationTestTrait.php",
 	'Wikimedia\\Tests\\Message\\MessageValueTest' => "$testDir/phpunit/unit/includes/libs/Message/MessageValueTest.php",
 	'Wikimedia\\Tests\\Message\\ScalarParamTest' => "$testDir/phpunit/unit/includes/libs/Message/ScalarParamTest.php",
+	'Wikimedia\\Tests\\Message\\T377912TestCase' => "$testDir/phpunit/unit/includes/libs/Message/T377912TestCase.php",
 
 	# tests/phpunit/unit/includes/utils
 	'UrlUtilsProviders' => "$testDir/phpunit/unit/includes/utils/UrlUtilsProviders.php",
@@ -332,7 +335,6 @@ $wgAutoloadClasses += [
 	'MediaWiki\\Tests\\User\\TempUser\\TempUserTestTrait' => "$testDir/phpunit/integration/includes/user/TempUser/TempUserTestTrait.php",
 
 	# tests/phpunit/structure
-	'MediaWiki\\Tests\\Structure\\BundleSizeTest' => "$testDir/phpunit/structure/BundleSizeTestBase.php",
 	'MediaWiki\\Tests\\Structure\\BundleSizeTestBase' => "$testDir/phpunit/structure/BundleSizeTestBase.php",
 
 	# tests/phpunit/unit/includes/Rest

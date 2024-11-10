@@ -298,12 +298,6 @@ abstract class Skin extends ContextSource {
 	 *  - `bodyClasses`: An array of extra class names to add to the HTML `<body>` element.
 	 *     Default: `[]`
 	 *
-	 *  - `bodyOnly`: Whether the skin is takes control of generating the `<html>`, `<head>` and
-	 *    `<body>` elements. This is for SkinTemplate subclasses only. For SkinMustache, this is
-	 *     always true and ignored.
-	 *
-	 *     Default: `false`
-	 *
 	 *  - `clientPrefEnabled`: Enable support for mw.user.clientPrefs.
 	 *     This instructs OutputPage and ResourceLoader\ClientHtml to include an inline script
 	 *     in web responses for unregistered users to switch HTML classes as needed.
@@ -677,6 +671,29 @@ abstract class Skin extends ContextSource {
 		}
 
 		return $this->mRelevantUser;
+	}
+
+	/**
+	 * Outputs the HTML for the page.
+	 * @internal Only to be called by OutputPage.
+	 */
+	final public function outputPageFinal( OutputPage $out ) {
+		// generate body
+		ob_start();
+		$this->outputPage();
+		$html = ob_get_contents();
+		ob_end_clean();
+
+		// T259955: OutputPage::headElement must be called last
+		// as it calls OutputPage::getRlClient, which freezes the ResourceLoader
+		// modules queue for the current page load.
+		// Since Skins can add ResourceLoader modules via OutputPage::addModule
+		// and OutputPage::addModuleStyles changing this order can lead to
+		// bugs.
+		$head = $out->headElement( $this );
+		$tail = $out->tailElement( $this );
+
+		echo $head . $html . $tail;
 	}
 
 	/**
@@ -1153,6 +1170,7 @@ abstract class Skin extends ContextSource {
 	 * @return string
 	 */
 	public static function makeSpecialUrl( $name, $urlaction = '', $proto = null ) {
+		wfDeprecated( __METHOD__, '1.39' );
 		return SkinComponentUtils::makeSpecialUrl( $name, $urlaction, $proto );
 	}
 
@@ -1164,6 +1182,7 @@ abstract class Skin extends ContextSource {
 	 * @return string
 	 */
 	public static function makeSpecialUrlSubpage( $name, $subpage, $urlaction = '' ) {
+		wfDeprecated( __METHOD__, '1.39' );
 		return SkinComponentUtils::makeSpecialUrlSubpage( $name, $subpage, $urlaction );
 	}
 
@@ -2139,6 +2158,7 @@ abstract class Skin extends ContextSource {
 					[ 'single-id' => "pt-$key" ],
 				],
 				'id' => "pt-$key",
+				'icon' => $plink[ 'icon' ] ?? null,
 			];
 			if ( $applyClassesToListItems && isset( $plink['class'] ) ) {
 				$ptool['class'] = $plink['class'];
@@ -2287,54 +2307,6 @@ abstract class Skin extends ContextSource {
 	}
 
 	/**
-	 * @since 1.35
-	 * @param array $attrs (optional) will be passed to tooltipAndAccesskeyAttribs
-	 *  and decorate the resulting input
-	 * @deprecated since 1.39; use $this->getTemplateData()['data-search-box'] instead.
-	 * @return string of HTML input
-	 */
-	public function makeSearchInput( $attrs = [] ) {
-		wfDeprecated( __METHOD__,
-			'[1.39] use $this->getTemplateData()["data-search-box"] or SkinTemplate::makeSearchInput'
-		);
-
-		// It's possible that getTemplateData might be calling
-		// Skin::makeSearchInput. To avoid infinite recursion create a
-		// new instance of the search component here.
-		$searchBox = $this->getComponent( 'search-box' );
-		$data = $searchBox->getTemplateData();
-
-		return Html::element( 'input',
-			$data[ 'array-input-attributes' ] + $attrs
-		);
-	}
-
-	/**
-	 * @param string $mode representing the type of button wanted
-	 *  either `go`, `fulltext` or `image`
-	 * @param array $attrs (optional)
-	 * @deprecated since 1.39; use $this->getTemplateData()['data-search-box'] instead.
-	 *   Note: When removing this function please merge SkinTemplate::makeSearchButtonInternal
-	 *   with SkinTemplate::makeSearchButton.
-	 * @return string of HTML button
-	 */
-	public function makeSearchButton( $mode, $attrs = [] ) {
-		wfDeprecated( __METHOD__,
-			'[1.39] use $this->getTemplateData()["data-search-box"] or SkinTemplate::makeSearchButton'
-		);
-
-		// It's possible that getTemplateData might be calling
-		// Skin::makeSearchInput. To avoid infinite recursion create a
-		// new instance of the search component here.
-		$searchBox = $this->getComponent( 'search-box' );
-		$data = $searchBox->getTemplateData();
-
-		return SkinTemplate::makeSearchButtonInternal(
-			$mode, $data, $attrs
-		);
-	}
-
-	/**
 	 * Allows extensions to hook into known portlets and add stuff to them.
 	 * Unlike its BaseTemplate counterpart, this method does not wrap the html
 	 * provided by the hook in a div.
@@ -2458,7 +2430,6 @@ abstract class Skin extends ContextSource {
 			'toc' => true,
 			'format' => 'html',
 			'bodyClasses' => [],
-			'bodyOnly' => false,
 			'clientPrefEnabled' => false,
 			'responsive' => false,
 			'supportsMwHeading' => false,

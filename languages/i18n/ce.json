@@ -1,7 +1,6 @@
 {
 	"@metadata": {
 		"authors": [
-			"Amire80",
 			"BaRaN6161 TURK",
 			"Chechenka",
 			"Comp1089",
@@ -2538,8 +2537,6 @@
 	"block-options": "Кхин тӀе опцеш:",
 	"block-options-description": "ХӀокху параметраш гӀо дийр ду хьуна хӀара декъашхо тергонехь латто, кхин а проблемаш ца хилийта.",
 	"block-reason": "Бахьана:",
-	"block-user-label": "Муьлхачу декъашхочунна блоктоха лаьа хьуна?",
-	"block-user-description": "Декъашхочунна билгалйаккха мегар ду декъашхочун цӀе, IP-адрес, йа IP-адресийн диапазон.",
 	"block-user-placeholder": "Декъашхочун цӀе йазйе…",
 	"block-target": "IP-адрес йа декъашхочун цӀе:",
 	"block-target-placeholder": "ДекъашхочунЦӀе, 1.1.1.42 йа 1.1.1.42/16",
@@ -3966,7 +3963,7 @@
 	"restsandbox": "REST-ловзаран майда",
 	"restsandbox-text": "ХӀокху агӀонгахь REST API-на дехарш кхуллу. Тидам бе, API дехарша жигара вики чулацамца йукъаметтиг лелор бу.",
 	"restsandbox-select-api": "Таллам бан API харжа.",
-	"restsandbox-no-specs-configured": "Цхьа а REST API нис ца йина талламна. Лелайе RestExplorerSpecs.",
+	"restsandbox-no-specs-configured": "Цхьа а REST API нис ца йина талламна. Лелайе RestSandboxSpecs.",
 	"restsandbox-no-such-api": "ХӀара API параметр ловш йац: $1",
 	"restsandbox-jsonly": "JavaScript оьшу REST спецификаци хьажа.",
 	"blockedtext-made-by": "Блок администраторо тоьхна $1",
@@ -3998,7 +3995,6 @@
 	"renameuser-error-same-user": "Хьуна цало хьалха хилла цӀеран тӀе хийца.",
 	"renameuser-error-temp-user": "Шуга цӀе ца хийцало ханна тоьхна чоьтан йозана «$1».",
 	"renameuser-error-temp-user-reserved": "Хьоьга лелалур йац «$1». Иза тӀехьлонна дӀайиллина йу ханна йолу чоьтан йозанашна.",
-	"renameuser-error-self-rename": "Хьан аьтту бац хьай цӀе хийца",
 	"renameusersuccess": "Декъашхочун цӀе«<nowiki>$1</nowiki>» хийцина → «<nowiki>$2</nowiki>».",
 	"renameuser-page-exists": "АгӀо $1 йолуш йу цундела авто-дӀайазйан йиш йац.",
 	"renameuser-page-moved": "АгӀонан $1 цӀе хийцина → $2.",

@@ -1,12 +1,12 @@
 <?php
 
+use MediaWiki\Api\ApiMessage;
 use MediaWiki\Language\RawMessage;
 use MediaWiki\MainConfigNames;
 use MediaWiki\MediaWikiServices;
 use MediaWiki\Message\Message;
-use MediaWiki\Message\UserGroupMembershipParam;
 use MediaWiki\Page\PageReferenceValue;
-use MediaWiki\User\UserIdentityValue;
+use MediaWiki\Title\Title;
 use Wikimedia\Assert\ParameterTypeException;
 use Wikimedia\Bcp47Code\Bcp47CodeValue;
 use Wikimedia\Message\MessageSpecifier;
@@ -129,7 +129,7 @@ class MessageTest extends MediaWikiLangTestCase {
 		$returned = $msg->params( ...$args );
 
 		$this->assertSame( $msg, $returned );
-		$this->assertSame( $expected, $msg->getParams() );
+		$this->assertEquals( $expected, $msg->getParams() );
 	}
 
 	public static function provideConstructorLanguage() {
@@ -425,7 +425,7 @@ class MessageTest extends MediaWikiLangTestCase {
 
 	/**
 	 * @covers \MediaWiki\Language\RawMessage
-	 * @covers \CoreTagHooks::html
+	 * @covers \MediaWiki\Parser\CoreTagHooks::html
 	 */
 	public function testRawHtmlInMsg() {
 		$this->overrideConfigValue( MainConfigNames::RawHtml, true );
@@ -528,21 +528,6 @@ class MessageTest extends MediaWikiLangTestCase {
 			'(group-bot)',
 			$msg->userGroupParams( 'bot' )->plain(),
 			'user group is handled correctly'
-		);
-	}
-
-	public function testUserGroupMemberParams() {
-		$this->expectDeprecationAndContinue( '/UserGroupMembershipParam/' );
-		$this->expectDeprecationAndContinue( '/objectParams/' );
-		$lang = $this->getServiceContainer()->getLanguageFactory()->getLanguage( 'qqx' );
-		$msg = new RawMessage( '$1' );
-		$this->setUserLang( $lang );
-		$this->assertSame(
-			'(group-bot-member: user)',
-			$msg->objectParams(
-				new UserGroupMembershipParam( 'bot', new UserIdentityValue( 1, 'user' ) )
-			)->plain(),
-			'user group member is handled correctly'
 		);
 	}
 
@@ -863,7 +848,7 @@ class MessageTest extends MediaWikiLangTestCase {
 
 		yield "Serializing raw parameters" => [
 			fn () => ( new Message( 'parentheses' ) )->rawParams( '<a>foo</a>' ),
-			'O:25:"MediaWiki\Message\Message":7:{s:9:"interface";b:1;s:8:"language";N;s:3:"key";s:11:"parentheses";s:9:"keysToTry";a:1:{i:0;s:11:"parentheses";}s:10:"parameters";a:1:{i:0;a:1:{s:3:"raw";s:10:"<a>foo</a>";}}s:11:"useDatabase";b:1;s:10:"titlevalue";N;}',
+			'O:25:"MediaWiki\Message\Message":7:{s:9:"interface";b:1;s:8:"language";N;s:3:"key";s:11:"parentheses";s:9:"keysToTry";a:1:{i:0;s:11:"parentheses";}s:10:"parameters";a:1:{i:0;O:29:"Wikimedia\Message\ScalarParam":2:{s:7:"' . chr( 0 ) . '*' . chr( 0 ) . 'type";s:3:"raw";s:8:"' . chr( 0 ) . '*' . chr( 0 ) . 'value";s:10:"<a>foo</a>";}}s:11:"useDatabase";b:1;s:10:"titlevalue";N;}',
 			'(<a>foo</a>)',
 		];
 
@@ -882,6 +867,12 @@ class MessageTest extends MediaWikiLangTestCase {
 
 	public function provideSerializationLegacy() {
 		// Test cases where we can test only unserialization, because the serialization format changed.
+
+		yield "MW 1.42: Magic arrays instead of MessageParam objects" => [
+			fn () => ( new Message( 'parentheses' ) )->rawParams( '<a>foo</a>' ),
+			'O:25:"MediaWiki\Message\Message":7:{s:9:"interface";b:1;s:8:"language";N;s:3:"key";s:11:"parentheses";s:9:"keysToTry";a:1:{i:0;s:11:"parentheses";}s:10:"parameters";a:1:{i:0;a:1:{s:3:"raw";s:10:"<a>foo</a>";}}s:11:"useDatabase";b:1;s:10:"titlevalue";N;}',
+			'(<a>foo</a>)',
+		];
 
 		yield "MW 1.41: Un-namespaced class" => [
 			fn () => new Message( 'mainpage' ),

@@ -22,12 +22,12 @@
 
 namespace MediaWiki\Api;
 
+use MediaWiki\ChangeTags\ChangeTagsStore;
 use MediaWiki\CommentFormatter\CommentFormatter;
 use MediaWiki\Content\IContentHandlerFactory;
 use MediaWiki\Content\Renderer\ContentRenderer;
 use MediaWiki\Content\Transform\ContentTransformer;
 use MediaWiki\MainConfigNames;
-use MediaWiki\MediaWikiServices;
 use MediaWiki\ParamValidator\TypeDef\UserDef;
 use MediaWiki\Parser\ParserFactory;
 use MediaWiki\Revision\RevisionRecord;
@@ -51,31 +51,18 @@ class ApiQueryAllRevisions extends ApiQueryRevisionsBase {
 	private RevisionStore $revisionStore;
 	private ActorMigration $actorMigration;
 	private NamespaceInfo $namespaceInfo;
+	private ChangeTagsStore $changeTagsStore;
 
-	/**
-	 * @param ApiQuery $query
-	 * @param string $moduleName
-	 * @param RevisionStore $revisionStore
-	 * @param IContentHandlerFactory $contentHandlerFactory
-	 * @param ParserFactory $parserFactory
-	 * @param SlotRoleRegistry $slotRoleRegistry
-	 * @param ActorMigration $actorMigration
-	 * @param NamespaceInfo $namespaceInfo
-	 * @param ContentRenderer $contentRenderer
-	 * @param ContentTransformer $contentTransformer
-	 * @param CommentFormatter $commentFormatter
-	 * @param TempUserCreator $tempUserCreator
-	 * @param UserFactory $userFactory
-	 */
 	public function __construct(
 		ApiQuery $query,
-		$moduleName,
+		string $moduleName,
 		RevisionStore $revisionStore,
 		IContentHandlerFactory $contentHandlerFactory,
 		ParserFactory $parserFactory,
 		SlotRoleRegistry $slotRoleRegistry,
 		ActorMigration $actorMigration,
 		NamespaceInfo $namespaceInfo,
+		ChangeTagsStore $changeTagsStore,
 		ContentRenderer $contentRenderer,
 		ContentTransformer $contentTransformer,
 		CommentFormatter $commentFormatter,
@@ -99,6 +86,7 @@ class ApiQueryAllRevisions extends ApiQueryRevisionsBase {
 		$this->revisionStore = $revisionStore;
 		$this->actorMigration = $actorMigration;
 		$this->namespaceInfo = $namespaceInfo;
+		$this->changeTagsStore = $changeTagsStore;
 	}
 
 	/**
@@ -169,8 +157,7 @@ class ApiQueryAllRevisions extends ApiQueryRevisionsBase {
 
 		if ( $this->fld_tags ) {
 			$this->addFields( [
-				'ts_tags' => MediaWikiServices::getInstance()->getChangeTagsStore()
-					->makeTagSummarySubquery( 'revision' )
+				'ts_tags' => $this->changeTagsStore->makeTagSummarySubquery( 'revision' )
 			] );
 		}
 

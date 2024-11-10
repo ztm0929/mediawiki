@@ -60,7 +60,6 @@ use MediaWiki\User\UserTimeCorrection;
 use MediaWiki\Utils\MWTimestamp;
 use MediaWiki\Xml\XmlSelect;
 use NumberFormatter;
-use ReplacementArray;
 use RuntimeException;
 use StringUtils;
 use UtfNormal\Validator as UtfNormalValidator;
@@ -301,6 +300,8 @@ class Language implements Bcp47Code {
 	private const LRE = "\u{202A}"; // U+202A LEFT-TO-RIGHT EMBEDDING
 	private const RLE = "\u{202B}"; // U+202B RIGHT-TO-LEFT EMBEDDING
 	private const PDF = "\u{202C}"; // U+202C POP DIRECTIONAL FORMATTING
+	// https://en.wikipedia.org/wiki/Arabic_letter_mark (Unicode 6.3.0)
+	private const ALM = "\u{061C}"; // U+061C ARABIC LETTER MARK
 
 	/**
 	 * Directionality test regex for embedBidi(). Matches the first strong directionality codepoint:
@@ -3274,13 +3275,11 @@ class Language implements Bcp47Code {
 
 		// Remove any LRM or RLM characters generated from NumberFormatter,
 		// since directionality is handled outside of this context.
-		// Similarly remove \u61C, the "Arabic Letter mark" (unicode 6.3.0)
-		// https://en.wikipedia.org/wiki/Arabic_letter_mark
-		// which is added starting PHP 7.3+
+		// Similarly remove \u61C (ALM) which is added starting PHP 7.3+
 		return strtr( $number, [
-			"\u{200E}" => '', // LRM
-			"\u{200F}" => '', // RLM
-			"\u{061C}" => '', // ALM
+			self::LRM => '',
+			self::RLM => '',
+			self::ALM => '',
 		] );
 	}
 
@@ -4585,6 +4584,7 @@ class Language implements Bcp47Code {
 			'digitTransformTable' => $this->digitTransformTable(),
 			'separatorTransformTable' => $this->separatorTransformTable(),
 			'minimumGroupingDigits' => $this->minimumGroupingDigits(),
+			'formalityIndex' => $this->getFormalityIndex(),
 			'grammarForms' => $this->getGrammarForms(),
 			'grammarTransformations' => $this->getGrammarTransformations(),
 			'pluralRules' => $this->getPluralRules(),

@@ -14,6 +14,7 @@ use MediaWiki\Languages\LanguageNameUtils;
 use MediaWiki\Linker\LinkRenderer;
 use MediaWiki\MainConfigNames;
 use MediaWiki\MediaWikiServices;
+use MediaWiki\Parser\ParserFactory;
 use MediaWiki\Permissions\PermissionManager;
 use MediaWiki\Preferences\DefaultPreferencesFactory;
 use MediaWiki\Preferences\SignatureValidatorFactory;
@@ -472,7 +473,7 @@ class DefaultPreferencesFactoryTest extends \MediaWikiIntegrationTestCase {
 	private function createUserOptionsManagerMock( array $userOptions, bool $defaultOptions = false ) {
 		$services = $this->getServiceContainer();
 		$defaults = $services->getMainConfig()->get( MainConfigNames::DefaultUserOptions );
-		$defaults['language'] = $services->getContentLanguage()->getCode();
+		$defaults['language'] = $services->getContentLanguageCode()->toString();
 		$defaults['skin'] = Skin::normalizeKey( $services->getMainConfig()->get( MainConfigNames::DefaultSkin ) );
 		( new HookRunner( $services->getHookContainer() ) )->onUserGetDefaultOptions( $defaults );
 		$userOptions += $defaults;

@@ -199,21 +199,6 @@ class AuthManager implements LoggerAwareInterface {
 	/** Call all authentication providers */
 	private const CALL_ALL = self::CALL_PRE | self::CALL_PRIMARY | self::CALL_SECONDARY;
 
-	/** @var WebRequest */
-	private $request;
-
-	/** @var Config */
-	private $config;
-
-	/** @var ObjectFactory */
-	private $objectFactory;
-
-	/** @var LoggerInterface */
-	private $logger;
-
-	/** @var UserNameUtils */
-	private $userNameUtils;
-
 	/** @var AuthenticationProvider[] */
 	private $allAuthenticationProviders = [];
 
@@ -229,60 +214,24 @@ class AuthManager implements LoggerAwareInterface {
 	/** @var CreatedAccountAuthenticationRequest[] */
 	private $createdAccountAuthenticationRequests = [];
 
-	/** @var HookContainer */
-	private $hookContainer;
+	private WebRequest $request;
+	private Config $config;
+	private ObjectFactory $objectFactory;
+	private LoggerInterface $logger;
+	private UserNameUtils $userNameUtils;
+	private HookContainer $hookContainer;
+	private HookRunner $hookRunner;
+	private ReadOnlyMode $readOnlyMode;
+	private BlockManager $blockManager;
+	private WatchlistManager $watchlistManager;
+	private ILoadBalancer $loadBalancer;
+	private Language $contentLanguage;
+	private LanguageConverterFactory $languageConverterFactory;
+	private BotPasswordStore $botPasswordStore;
+	private UserFactory $userFactory;
+	private UserIdentityLookup $userIdentityLookup;
+	private UserOptionsManager $userOptionsManager;
 
-	/** @var HookRunner */
-	private $hookRunner;
-
-	/** @var ReadOnlyMode */
-	private $readOnlyMode;
-
-	/** @var BlockManager */
-	private $blockManager;
-
-	/** @var WatchlistManager */
-	private $watchlistManager;
-
-	/** @var ILoadBalancer */
-	private $loadBalancer;
-
-	/** @var Language */
-	private $contentLanguage;
-
-	/** @var LanguageConverterFactory */
-	private $languageConverterFactory;
-
-	/** @var BotPasswordStore */
-	private $botPasswordStore;
-
-	/** @var UserFactory */
-	private $userFactory;
-
-	/** @var UserIdentityLookup */
-	private $userIdentityLookup;
-
-	/** @var UserOptionsManager */
-	private $userOptionsManager;
-
-	/**
-	 * @param WebRequest $request
-	 * @param Config $config
-	 * @param ObjectFactory $objectFactory
-	 * @param HookContainer $hookContainer
-	 * @param ReadOnlyMode $readOnlyMode
-	 * @param UserNameUtils $userNameUtils
-	 * @param BlockManager $blockManager
-	 * @param WatchlistManager $watchlistManager
-	 * @param ILoadBalancer $loadBalancer
-	 * @param Language $contentLanguage
-	 * @param LanguageConverterFactory $languageConverterFactory
-	 * @param BotPasswordStore $botPasswordStore
-	 * @param UserFactory $userFactory
-	 * @param UserIdentityLookup $userIdentityLookup
-	 * @param UserOptionsManager $userOptionsManager
-	 *
-	 */
 	public function __construct(
 		WebRequest $request,
 		Config $config,
@@ -319,9 +268,6 @@ class AuthManager implements LoggerAwareInterface {
 		$this->userOptionsManager = $userOptionsManager;
 	}
 
-	/**
-	 * @param LoggerInterface $logger
-	 */
 	public function setLogger( LoggerInterface $logger ) {
 		$this->logger = $logger;
 	}
@@ -1375,8 +1321,11 @@ class AuthManager implements LoggerAwareInterface {
 			return AuthenticationResponse::newFail( $status->getMessage() );
 		}
 
+		// Avoid deadlocks by placing no shared or exclusive gap locks (T199393)
+		// As defense in-depth, PrimaryAuthenticationProvider::testUserExists only
+		// supports READ_NORMAL/READ_LATEST (no support for recency query flags).
 		$status = $this->canCreateAccount(
-			$username, [ 'flags' => IDBAccessObject::READ_LOCKING, 'creating' => true ]
+			$username, [ 'flags' => IDBAccessObject::READ_LATEST, 'creating' => true ]
 		);
 		if ( !$status->isGood() ) {
 			$this->logger->debug( __METHOD__ . ': {user} cannot be created: {reason}', [
@@ -1534,7 +1483,7 @@ class AuthManager implements LoggerAwareInterface {
 			}
 
 			// Load from primary DB for existence check
-			$user->load( IDBAccessObject::READ_LOCKING );
+			$user->load( IDBAccessObject::READ_LATEST );
 
 			if ( $state['userid'] === 0 ) {
 				if ( $user->isRegistered() ) {
@@ -1877,6 +1826,32 @@ class AuthManager implements LoggerAwareInterface {
 	}
 
 	/**
+	 * @param Status $status
+	 * @param User $targetUser
+	 * @param string $source What caused the auto-creation @see ::autoCreateUser
+	 * @param bool $login Whether to also log the user in
+	 * @return void
+	 * @todo Inject both identityUtils and logger
+	 */
+	private function logAutocreationAttempt( Status $status, User $targetUser, $source, $login ) {
+		if ( $status->isOK() && !$status->isGood() ) {
+			return; // user already existed, no need to log
+		}
+
+		$firstMessage = $status->getMessages( 'error' )[0] ?? $status->getMessages( 'warning' )[0] ?? null;
+		$identityUtils = MediaWikiServices::getInstance()->getUserIdentityUtils();
+
+		\MediaWiki\Logger\LoggerFactory::getInstance( 'authevents' )->info( 'Autocreation attempt', [
+			'event' => 'autocreate',
+			'successful' => $status->isGood(),
+			'status' => $firstMessage ? $firstMessage->getKey() : '-',
+			'accountType' => $identityUtils->getShortUserTypeInternal( $targetUser ),
+			'source' => $source,
+			'login' => $login,
+		] );
+	}
+
+	/**
 	 * Auto-create an account, and optionally log into that account
 	 *
 	 * PrimaryAuthenticationProviders can invoke this method by returning a PASS from
@@ -1958,7 +1933,9 @@ class AuthManager implements LoggerAwareInterface {
 			] );
 			$user->setId( 0 );
 			$user->loadFromId();
-			return Status::newFatal( wfMessage( 'readonlytext', $reason ) );
+			$fatalStatus = Status::newFatal( wfMessage( 'readonlytext', $reason ) );
+			$this->logAutocreationAttempt( $fatalStatus, $user, $source, $login );
+			return $fatalStatus;
 		}
 
 		// If there is a non-anonymous performer, don't use their session
@@ -1977,11 +1954,10 @@ class AuthManager implements LoggerAwareInterface {
 			$user->setId( 0 );
 			$user->loadFromId();
 			$reason = $session->get( self::AUTOCREATE_BLOCKLIST );
-			if ( $reason instanceof StatusValue ) {
-				return Status::wrap( $reason );
-			} else {
-				return Status::newFatal( $reason );
-			}
+
+			$status = $reason instanceof StatusValue ? Status::wrap( $reason ) : Status::newFatal( $reason );
+			$this->logAutocreationAttempt( $status, $user, $source, $login );
+			return $status;
 		}
 
 		// Is the username usable? (Previously isCreatable() was checked here but
@@ -1995,7 +1971,9 @@ class AuthManager implements LoggerAwareInterface {
 			}
 			$user->setId( 0 );
 			$user->loadFromId();
-			return Status::newFatal( 'noname' );
+			$fatalStatus = Status::newFatal( 'noname' );
+			$this->logAutocreationAttempt( $fatalStatus, $user, $source, $login );
+			return $fatalStatus;
 		}
 
 		// Is the IP user able to create accounts?
@@ -2014,7 +1992,9 @@ class AuthManager implements LoggerAwareInterface {
 				}
 				$user->setId( 0 );
 				$user->loadFromId();
-				return Status::wrap( $status );
+				$statusWrapped = Status::wrap( $status );
+				$this->logAutocreationAttempt( $statusWrapped, $user, $source, $login );
+				return $statusWrapped;
 			}
 		}
 
@@ -2027,7 +2007,9 @@ class AuthManager implements LoggerAwareInterface {
 			] );
 			$user->setId( 0 );
 			$user->loadFromId();
-			return Status::newFatal( 'usernameinprogress' );
+			$status = Status::newFatal( 'usernameinprogress' );
+			$this->logAutocreationAttempt( $status, $user, $source, $login );
+			return $status;
 		}
 
 		// Denied by providers?
@@ -2052,6 +2034,7 @@ class AuthManager implements LoggerAwareInterface {
 				}
 				$user->setId( 0 );
 				$user->loadFromId();
+				$this->logAutocreationAttempt( $ret, $user, $source, $login );
 				return $ret;
 			}
 		}
@@ -2063,7 +2046,10 @@ class AuthManager implements LoggerAwareInterface {
 			] );
 			$user->setId( 0 );
 			$user->loadFromId();
-			return Status::newFatal( 'authmanager-autocreate-exception' );
+			$status = Status::newFatal( 'authmanager-autocreate-exception' );
+			$this->logAutocreationAttempt( $status, $user, $source, $login );
+			return $status;
+
 		}
 
 		// Checks passed, create the user...
@@ -2098,6 +2084,7 @@ class AuthManager implements LoggerAwareInterface {
 					$user->setId( 0 );
 					$user->loadFromId();
 				}
+				$this->logAutocreationAttempt( $status, $user, $source, $login );
 				return $status;
 			}
 		} catch ( \Exception $ex ) {
@@ -2148,8 +2135,9 @@ class AuthManager implements LoggerAwareInterface {
 			$remember = $source === self::AUTOCREATE_SOURCE_TEMP;
 			$this->setSessionDataForUser( $user, $remember );
 		}
-
-		return Status::newGood();
+		$retStatus = Status::newGood();
+		$this->logAutocreationAttempt( $retStatus, $user, $source, $login );
+		return $retStatus;
 	}
 
 	/**

@@ -89,6 +89,9 @@ use MediaWiki\Content\Transform\ContentTransformer;
 use MediaWiki\Context\RequestContext;
 use MediaWiki\DAO\WikiAwareEntity;
 use MediaWiki\Deferred\DeferredUpdates;
+use MediaWiki\DomainEvent\DomainEventDispatcher;
+use MediaWiki\DomainEvent\DomainEventSink;
+use MediaWiki\DomainEvent\DomainEventSource;
 use MediaWiki\Edit\ParsoidOutputStash;
 use MediaWiki\Edit\SimpleParsoidOutputStash;
 use MediaWiki\EditPage\Constraint\EditConstraintFactory;
@@ -113,6 +116,7 @@ use MediaWiki\JobQueue\JobQueueGroupFactory;
 use MediaWiki\Json\JsonCodec;
 use MediaWiki\Language\FormatterFactory;
 use MediaWiki\Language\Language;
+use MediaWiki\Language\LanguageCode;
 use MediaWiki\Language\LazyLocalizationContext;
 use MediaWiki\Languages\LanguageConverterFactory;
 use MediaWiki\Languages\LanguageFactory;
@@ -149,16 +153,18 @@ use MediaWiki\Page\RedirectStore;
 use MediaWiki\Page\RollbackPageFactory;
 use MediaWiki\Page\UndeletePageFactory;
 use MediaWiki\Page\WikiPageFactory;
+use MediaWiki\Parser\DateFormatterFactory;
 use MediaWiki\Parser\MagicWordFactory;
 use MediaWiki\Parser\Parser;
+use MediaWiki\Parser\ParserCache;
 use MediaWiki\Parser\ParserCacheFactory;
+use MediaWiki\Parser\ParserFactory;
 use MediaWiki\Parser\ParserObserver;
 use MediaWiki\Parser\Parsoid\Config\DataAccess as MWDataAccess;
 use MediaWiki\Parser\Parsoid\Config\PageConfigFactory as MWPageConfigFactory;
 use MediaWiki\Parser\Parsoid\Config\SiteConfig as MWSiteConfig;
 use MediaWiki\Parser\Parsoid\HtmlTransformFactory;
 use MediaWiki\Parser\Parsoid\LintErrorChecker;
-use MediaWiki\Parser\Parsoid\ParsoidOutputAccess;
 use MediaWiki\Parser\Parsoid\ParsoidParserFactory;
 use MediaWiki\Password\PasswordFactory;
 use MediaWiki\Permissions\GrantsInfo;
@@ -172,6 +178,7 @@ use MediaWiki\Preferences\DefaultPreferencesFactory;
 use MediaWiki\Preferences\PreferencesFactory;
 use MediaWiki\Preferences\SignatureValidator;
 use MediaWiki\Preferences\SignatureValidatorFactory;
+use MediaWiki\RecentChanges\ChangeTrackingEventIngress;
 use MediaWiki\Registration\ExtensionRegistry;
 use MediaWiki\Request\ProxyLookup;
 use MediaWiki\Request\WebRequest;
@@ -204,6 +211,7 @@ use MediaWiki\Storage\EditResultCache;
 use MediaWiki\Storage\NameTableStore;
 use MediaWiki\Storage\NameTableStoreFactory;
 use MediaWiki\Storage\PageEditStash;
+use MediaWiki\Storage\PageUpdatedEvent;
 use MediaWiki\Storage\PageUpdaterFactory;
 use MediaWiki\Storage\RevertedTagUpdateManager;
 use MediaWiki\Storage\SqlBlobStore;
@@ -247,8 +255,7 @@ use MediaWiki\Watchlist\WatchedItemStore;
 use MediaWiki\Watchlist\WatchlistManager;
 use MediaWiki\WikiMap\WikiMap;
 use Psr\Http\Client\ClientInterface;
-use Wikimedia\DependencyStore\KeyValueDependencyStore;
-use Wikimedia\DependencyStore\SqlModuleDependencyStore;
+use Wikimedia\DependencyStore\DependencyStore;
 use Wikimedia\EventRelayer\EventRelayerGroup;
 use Wikimedia\Message\IMessageFormatterFactory;
 use Wikimedia\Mime\MimeAnalyzer;
@@ -791,6 +798,14 @@ return [
 
 	'DeletePageFactory' => static function ( MediaWikiServices $services ): DeletePageFactory {
 		return $services->getService( '_PageCommandFactory' );
+	},
+
+	'DomainEventSink' => static function ( MediaWikiServices $services ): DomainEventSink {
+		return $services->getService( '_DomainEventDispatcher' );
+	},
+
+	'DomainEventSource' => static function ( MediaWikiServices $services ): DomainEventSource {
+		return $services->getService( '_DomainEventDispatcher' );
 	},
 
 	'Emailer' => static function ( MediaWikiServices $services ): IEmailer {
@@ -1538,6 +1553,7 @@ return [
 			$services->getContentLanguage(),
 			$services->getDBLoadBalancerFactory(),
 			$services->getContentHandlerFactory(),
+			$services->getDomainEventSink(),
 			$services->getHookContainer(),
 			$editResultCache,
 			$services->getUserNameUtils(),
@@ -1546,7 +1562,6 @@ return [
 				PageUpdaterFactory::CONSTRUCTOR_OPTIONS,
 				$services->getMainConfig()
 			),
-			$services->getUserEditTracker(),
 			$services->getUserGroupManager(),
 			$services->getTitleFormatter(),
 			$services->getContentTransformer(),
@@ -1648,17 +1663,6 @@ return [
 			$services->getReadOnlyMode(),
 			$services->getParserFactory(), // *legacy* parser factory
 			$services->getLinkBatchFactory()
-		);
-	},
-
-	'ParsoidOutputAccess' => static function ( MediaWikiServices $services ): ParsoidOutputAccess {
-		return new ParsoidOutputAccess(
-			$services->getParsoidParserFactory(),
-			$services->getParserOutputAccess(),
-			$services->getPageStore(),
-			$services->getRevisionLookup(),
-			$services->getParsoidSiteConfig(),
-			$services->getContentHandlerFactory()
 		);
 	},
 
@@ -1900,9 +1904,7 @@ return [
 		$rl = new ResourceLoader(
 			$config,
 			LoggerFactory::getInstance( 'resourceloader' ),
-			$config->get( MainConfigNames::ResourceLoaderUseObjectCacheForDeps )
-				? new KeyValueDependencyStore( $services->getMainObjectStash() )
-				: new SqlModuleDependencyStore( $services->getDBLoadBalancer() ),
+			new DependencyStore( $services->getMainObjectStash() ),
 			[
 				'loadScript' => $config->get( MainConfigNames::LoadScript ),
 				'maxageVersioned' => $maxage['versioned'] ?? null,
@@ -2682,6 +2684,55 @@ return [
 			$services->getNamespaceInfo(),
 			$services->get( '_ConditionalDefaultsLookup' )
 		);
+	},
+
+	'_DomainEventDispatcher' => static function ( MediaWikiServices $services ): DomainEventDispatcher {
+		$dispatcher = new DomainEventDispatcher(
+			$services->getHookContainer()
+		);
+
+		// Core event wiring.
+		// TODO: move this to a more prominent location? A separate file?
+
+		// Register listener for propagating PageUpdatedEvents to the
+		// change tracking component.
+		$dispatcher->registerListener(
+			PageUpdatedEvent::TYPE,
+			new ChangeTrackingEventIngress( // TODO: use an ObjectFactory spec
+				$services->getChangeTagsStore(),
+				$services->getUserEditTracker()
+			)
+		);
+
+		$extensionRegistry = $services->getExtensionRegistry();
+		foreach ( $extensionRegistry->getDomainEventTypes() as $eventType ) {
+			$listeners = $extensionRegistry->getDomainEventListeners( $eventType );
+			foreach ( $listeners as $listenerSpec ) {
+				$dispatcher->registerListener( $eventType, $listenerSpec );
+			}
+		}
+
+		// Automatically trigger the RevisionFromEditComplete hook (synchronously).
+		$hooks = $services->getHookContainer();
+		$hooks->register(
+			PageUpdatedEvent::TYPE,
+			static function ( PageUpdatedEvent $event ) use ( $hooks, $services ) {
+				$wikiPage = $services->getWikiPageFactory()
+					->newFromTitle( $event->getPage() );
+
+				$editResult = $event->getEditResult();
+
+				$hooks->run( 'RevisionFromEditComplete', [
+					$wikiPage,
+					$event->getNewRevision(),
+					$editResult ? $editResult->getOriginalRevisionId() : false,
+					$event->getAuthor(),
+					$event->getTags()
+				] );
+			}
+		);
+
+		return $dispatcher;
 	},
 
 	'_EditConstraintFactory' => static function ( MediaWikiServices $services ): EditConstraintFactory {

@@ -8,6 +8,7 @@ use MediaWiki\MainConfigNames;
 use MediaWiki\Output\OutputPage;
 use MediaWiki\Page\PageReferenceValue;
 use MediaWiki\Permissions\Authority;
+use MediaWiki\Request\FauxRequest;
 use MediaWiki\Tests\Unit\MockBlockTrait;
 use MediaWiki\Tests\Unit\Permissions\MockAuthorityTrait;
 use MediaWiki\Tests\User\TempUser\TempUserTestTrait;
@@ -403,6 +404,7 @@ class SkinTest extends MediaWikiIntegrationTestCase {
 							]
 						],
 						'id' => 'pt-foo',
+						'icon' => null,
 					]
 				],
 			],
@@ -425,6 +427,7 @@ class SkinTest extends MediaWikiIntegrationTestCase {
 							]
 						],
 						'id' => 'pt-foo',
+						'icon' => null,
 						'class' => 'foo',
 					]
 				],

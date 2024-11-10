@@ -13,6 +13,7 @@ use MediaWiki\Page\PageIdentity;
 use MediaWiki\Page\PageLookup;
 use MediaWiki\Page\ParserOutputAccess;
 use MediaWiki\Page\RedirectStore;
+use MediaWiki\Parser\ParserOptions;
 use MediaWiki\Parser\Parsoid\Config\SiteConfig as ParsoidSiteConfig;
 use MediaWiki\Parser\Parsoid\HtmlTransformFactory;
 use MediaWiki\Permissions\Authority;
@@ -54,7 +55,7 @@ class PageRestHelperFactory {
 	private RedirectStore $redirectStore;
 	private LanguageConverterFactory $languageConverterFactory;
 	private TitleFactory $titleFactory;
-	private IConnectionProvider $connectionProvider;
+	private IConnectionProvider $dbProvider;
 	private ChangeTagsStore $changeTagStore;
 	private StatsFactory $statsFactory;
 
@@ -74,7 +75,7 @@ class PageRestHelperFactory {
 		RedirectStore $redirectStore,
 		LanguageConverterFactory $languageConverterFactory,
 		TitleFactory $titleFactory,
-		IConnectionProvider $connectionProvider,
+		IConnectionProvider $dbProvider,
 		ChangeTagsStore $changeTagStore,
 		StatsFactory $statsFactory
 	) {
@@ -94,7 +95,7 @@ class PageRestHelperFactory {
 		$this->languageConverterFactory = $languageConverterFactory;
 		$this->statsFactory = $statsFactory;
 		$this->titleFactory = $titleFactory;
-		$this->connectionProvider = $connectionProvider;
+		$this->dbProvider = $dbProvider;
 		$this->changeTagStore = $changeTagStore;
 	}
 
@@ -105,7 +106,7 @@ class PageRestHelperFactory {
 			$this->titleFormatter,
 			$this->pageLookup,
 			$this->titleFactory,
-			$this->connectionProvider,
+			$this->dbProvider,
 			$this->changeTagStore
 		);
 	}
@@ -117,7 +118,7 @@ class PageRestHelperFactory {
 			$this->titleFormatter,
 			$this->pageLookup,
 			$this->titleFactory,
-			$this->connectionProvider,
+			$this->dbProvider,
 			$this->changeTagStore
 		);
 	}
@@ -137,13 +138,16 @@ class PageRestHelperFactory {
 	 * @param ?Authority $authority
 	 * @param int|RevisionRecord|null $revision
 	 * @param bool $lenientRevHandling
+	 * @param ParserOptions|null $parserOptions
+	 * @return HtmlOutputRendererHelper
 	 */
 	public function newHtmlOutputRendererHelper(
 		$page = null,
 		array $parameters = [],
 		?Authority $authority = null,
 		$revision = null,
-		bool $lenientRevHandling = false
+		bool $lenientRevHandling = false,
+		?ParserOptions $parserOptions = null
 	): HtmlOutputRendererHelper {
 		if ( is_bool( $page ) ) {
 			// Backward compatibility w/ pre-1.43 (deprecated)
@@ -172,7 +176,8 @@ class PageRestHelperFactory {
 			$parameters,
 			$authority,
 			$revision,
-			$lenientRevHandling
+			$lenientRevHandling,
+			$parserOptions
 		);
 	}
 

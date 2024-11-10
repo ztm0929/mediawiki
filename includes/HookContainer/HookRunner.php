@@ -49,6 +49,7 @@ use WikiPage;
  */
 class HookRunner implements
 	\MediaWiki\Actions\Hook\GetActionNameHook,
+	\MediaWiki\Auth\Hook\AuthenticationAttemptThrottledHook,
 	\MediaWiki\Auth\Hook\AuthManagerFilterProvidersHook,
 	\MediaWiki\Auth\Hook\AuthManagerLoginAuthenticateAuditHook,
 	\MediaWiki\Auth\Hook\AuthManagerVerifyAuthenticationHook,
@@ -385,6 +386,7 @@ class HookRunner implements
 	\MediaWiki\Hook\SpecialUploadCompleteHook,
 	\MediaWiki\Hook\SpecialVersionVersionUrlHook,
 	\MediaWiki\Hook\SpecialWatchlistGetNonRevisionTypesHook,
+	\MediaWiki\Hook\SpecialWhatLinksHereQueryHook,
 	\MediaWiki\Hook\TestCanonicalRedirectHook,
 	\MediaWiki\Hook\ThumbnailBeforeProduceHTMLHook,
 	\MediaWiki\Hook\TempUserCreatedRedirectHook,
@@ -930,6 +932,12 @@ class HookRunner implements
 	public function onAuthPreserveQueryParams( &$params, $options ) {
 		return $this->container->run(
 			'AuthPreserveQueryParams', [ &$params, $options ]
+		);
+	}
+
+	public function onAuthenticationAttemptThrottled( string $type, ?string $username, ?string $ip ) {
+		return $this->container->run(
+			'AuthenticationAttemptThrottled', [ $type, $username, $ip ]
 		);
 	}
 
@@ -3963,6 +3971,14 @@ class HookRunner implements
 		return $this->container->run(
 			'SpreadAnyEditBlock',
 			[ $user, &$blockWasSpread ]
+		);
+	}
+
+	public function onSpecialWhatLinksHereQuery( $table, $data, $queryBuilder ): void {
+		$this->container->run(
+			'SpecialWhatLinksHereQuery',
+			[ $table, $data, $queryBuilder ],
+			[ 'abortable' => false ]
 		);
 	}
 

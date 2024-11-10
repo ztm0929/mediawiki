@@ -2,7 +2,6 @@
 	"@metadata": {
 		"authors": [
 			"Albertoleoncio",
-			"Amire80",
 			"Comp1089",
 			"Enye Lav",
 			"Matma Rex",
@@ -766,8 +765,8 @@
 	"currentrev-asof": "$1-са медбӧръя версия",
 	"revisionasof": "\n$1-ся версия",
 	"revision-info": " $1-са версия {{GENDER:$6|$2}}$7",
-	"previousrevision": "Воддза версия",
-	"nextrevision": "Табӧрса версия",
+	"previousrevision": "← Воддза версия",
+	"nextrevision": "Табӧрса версия →",
 	"currentrevisionlink": "Ӧнія версия",
 	"cur": "ӧнія",
 	"tooltip-cur": "Бӧръя версияысь торъялӧм",
@@ -3870,7 +3869,6 @@
 	"renameuser-error-same-user": "Ті онӧ вермӧй сетны пырӧдчысьлы выль ним, кутшӧм вӧлі таӧдз нин.",
 	"renameuser-error-temp-user": "Ті онӧ вермӧй сетны выль ним недырся аккаунтлы \"$1\".",
 	"renameuser-error-temp-user-reserved": "Ті онӧ вермӧй вӧдитчыны \"$1\"-ӧн. Сійӧс видзӧны недырся аккаунтъяслы.",
-	"renameuser-error-self-rename": "Ті онӧ вермӧй сетны выль ним аслыныд.",
 	"renameusersuccess": "{{GENDER:$2|пырӧдчысьлы}} \"<nowiki>$1</nowiki>\" вӧлі сетӧма выль ним \"<nowiki>$2</nowiki>\".",
 	"renameuser-page-exists": "$1 лист бокыс эм нин и сійӧс оз позь автоматическӧя выльысь гижны.",
 	"renameuser-page-moved": "$1 лист бокыс вӧлі вештӧма $2-ӧ.",

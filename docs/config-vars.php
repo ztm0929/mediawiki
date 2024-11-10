@@ -2085,12 +2085,6 @@ $wgResourceBasePath = null;
 $wgResourceLoaderMaxage = null;
 
 /**
- * Config variable stub for the ResourceLoaderUseObjectCacheForDeps setting, for use by phpdoc and IDEs.
- * @see MediaWiki\MainConfigSchema::ResourceLoaderUseObjectCacheForDeps
- */
-$wgResourceLoaderUseObjectCacheForDeps = null;
-
-/**
  * Config variable stub for the ResourceLoaderDebug setting, for use by phpdoc and IDEs.
  * @see MediaWiki\MainConfigSchema::ResourceLoaderDebug
  */
@@ -2860,6 +2854,12 @@ $wgAutopromoteOnce = null;
  * @see MediaWiki\MainConfigSchema::AutopromoteOnceLogInRC
  */
 $wgAutopromoteOnceLogInRC = null;
+
+/**
+ * Config variable stub for the AutopromoteOnceRCExcludedGroups setting, for use by phpdoc and IDEs.
+ * @see MediaWiki\MainConfigSchema::AutopromoteOnceRCExcludedGroups
+ */
+$wgAutopromoteOnceRCExcludedGroups = null;
 
 /**
  * Config variable stub for the AddGroups setting, for use by phpdoc and IDEs.

@@ -2,7 +2,6 @@
 	"@metadata": {
 		"authors": [
 			"Amdf",
-			"Amire80",
 			"Azim",
 			"DannyS712",
 			"Fitoschido",
@@ -2502,8 +2501,6 @@
 	"block-options": "Ешартыш келыштарымаш:",
 	"block-options-description": "Умбакыже экшык-влакым кораҥдашлан, тиде параметр-влак тылат тиде ушнышым эскераш полшен кертыт.",
 	"block-reason": "Амал:",
-	"block-user-label": "Кудо кучылтшым тый чарынет?",
-	"block-user-description": "Кучылтшо семын кучылтшо, IP-адресс але IP-адресс диапозон лийын кертыт.",
 	"block-user-placeholder": "Кучылтшын лӱмжым пурташ тӱҥал...",
 	"block-target": "Ушнышын лӱмжӧ, IP адрес але IP адрес диапазон:",
 	"block-target-placeholder": "УшнышоЛӱм, 1.1.1.42 але 1.1.1.42/16",
@@ -3922,7 +3919,6 @@
 	"renameuser-error-same-user": "Тый ушнышылан ондакысе лийше лӱмжым пуэн от керт.",
 	"renameuser-error-temp-user": "Тый «$1» жаплан лийше аккаунтым вес семын лӱмден от керт.",
 	"renameuser-error-temp-user-reserved": "Тый «$1» лӱмым кучылтын от керт. Тудым жаплан лийше аккаунт-влаклан шапашлен кодымо.",
-	"renameuser-error-self-rename": "Шканет вес лӱмым пуэн от керт",
 	"renameusersuccess": "«<nowiki>$1</nowiki>» {{GENDER:$2|ушнышым}} «<nowiki>$2</nowiki>» семын лӱмдымӧ.",
 	"renameuser-page-exists": "$1 велыж ынде уло да тудым вигак угыч возаш огеш лий.",
 	"renameuser-page-moved": "$1 велыжым $2 семын лӱмдымӧ.",

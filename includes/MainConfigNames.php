@@ -2100,12 +2100,6 @@ class MainConfigNames {
 	public const ResourceLoaderMaxage = 'ResourceLoaderMaxage';
 
 	/**
-	 * Name constant for the ResourceLoaderUseObjectCacheForDeps setting, for use with Config::get()
-	 * @see MainConfigSchema::ResourceLoaderUseObjectCacheForDeps
-	 */
-	public const ResourceLoaderUseObjectCacheForDeps = 'ResourceLoaderUseObjectCacheForDeps';
-
-	/**
 	 * Name constant for the ResourceLoaderDebug setting, for use with Config::get()
 	 * @see MainConfigSchema::ResourceLoaderDebug
 	 */
@@ -2875,6 +2869,12 @@ class MainConfigNames {
 	 * @see MainConfigSchema::AutopromoteOnceLogInRC
 	 */
 	public const AutopromoteOnceLogInRC = 'AutopromoteOnceLogInRC';
+
+	/**
+	 * Name constant for the AutopromoteOnceRCExcludedGroups setting, for use with Config::get()
+	 * @see MainConfigSchema::AutopromoteOnceRCExcludedGroups
+	 */
+	public const AutopromoteOnceRCExcludedGroups = 'AutopromoteOnceRCExcludedGroups';
 
 	/**
 	 * Name constant for the AddGroups setting, for use with Config::get()

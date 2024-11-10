@@ -8,6 +8,7 @@ use MediaWiki\Context\IContextSource;
 use MediaWiki\Context\RequestContext;
 use MediaWiki\MainConfigNames;
 use MediaWiki\Request\FauxRequest;
+use MediaWiki\SpecialPage\SpecialPage;
 use MediaWiki\Specials\SpecialCreateAccount;
 
 /**
@@ -23,7 +24,8 @@ class SpecialCreateAccountTest extends SpecialPageTestBase {
 		$context ??= RequestContext::getMain();
 		$page = new SpecialCreateAccount(
 			$services->getAuthManager(),
-			$services->getFormatterFactory()
+			$services->getFormatterFactory(),
+			$services->getUserIdentityUtils()
 		);
 		$page->setContext( $context );
 		$context->setTitle( $page->getPageTitle() );

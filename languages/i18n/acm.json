@@ -2,7 +2,6 @@
 	"@metadata": {
 		"authors": [
 			"Ahmedadeljaff",
-			"Amire80",
 			"Dr-Taher",
 			"Hubaishan",
 			"Lolekek",
@@ -775,8 +774,8 @@
 	"currentrev-asof": "المراجعة الحالية بتاريخ $1",
 	"revisionasof": "مراجعه $1",
 	"revision-info": "مراجعة $1 بواسطة {{GENDER:$6|$2}}$7",
-	"previousrevision": "مراجعة أقدم",
-	"nextrevision": "مراجعة أحدث",
+	"previousrevision": "→ مراجعة أقدم",
+	"nextrevision": "مراجعة أحدث ←",
 	"currentrevisionlink": "المراجعة الحالية",
 	"cur": "حالياً",
 	"tooltip-cur": "الفرق وي المراجعه الأخيره",
@@ -2231,8 +2230,6 @@
 	"block-options": "اعدادات زياده:",
 	"block-options-description": "هاي الاعدادات تساعد تراقب النفر، حتى لا تصير مشاكل زياده.",
 	"block-reason": "سبب:",
-	"block-user-label": "شنو النفر التريد تحظره؟",
-	"block-user-description": "النفر يصير لو يوزر لو آيبي لو نطاق مال آيبي.",
 	"block-user-placeholder": "ابدي اكتب يوزر...",
 	"block-target": "يوزر لو آيبي لو نطاق آيبي",
 	"block-target-placeholder": "يوزر، 1.1.1.42 لو 1.1.1.42/16",

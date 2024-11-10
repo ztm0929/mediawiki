@@ -1,6 +1,7 @@
 <?php
 
 use MediaWiki\CommentStore\CommentStoreComment;
+use MediaWiki\Content\ContentHandler;
 use MediaWiki\Deferred\DeferredUpdates;
 use MediaWiki\MainConfigNames;
 use MediaWiki\Revision\RevisionRecord;
@@ -65,7 +66,7 @@ class MessageCacheTest extends MediaWikiLangTestCase {
 	 */
 	private function makePage( $title, $lang, $content = null ) {
 		$content ??= $lang;
-		if ( $lang !== $this->getServiceContainer()->getContentLanguage()->getCode() ) {
+		if ( $lang !== $this->getServiceContainer()->getContentLanguageCode()->toString() ) {
 			$title = "$title/$lang";
 		}
 
