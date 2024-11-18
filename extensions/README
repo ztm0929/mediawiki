@@ -1,12 +1,11 @@
-== User Information ==
+== 适用于普通用户的说明信息 ==
 
-Extensions are distributed separately. Drop them into this directory and enable
-as per the extension's installation instructions.
+扩展都是单独分发的。请将它们放在此目录下并按照各自的安装说明进行配置启用。
 
-You can find a list of extensions and documentation at
+你可以在这里查阅扩展列表以及说明文档
 <https://www.mediawiki.org/wiki/Special:MyLanguage/Category:Extensions>.
 
-== Development Information ==
+== 适用于开发者的说明信息 ==
 
 If you are a developer, you might want to fetch the extension tree in another
 directory and make a symbolic link:
