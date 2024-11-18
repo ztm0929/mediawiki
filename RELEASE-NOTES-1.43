@@ -213,15 +213,20 @@ For notes on 1.42.x and older releases, see HISTORY.
 * Updated justinrainbow/json-schema from 5.2.13 to 5.3.0.
 * Updated pear/mail from 1.6.0 to 2.0.0.
 * Updated pear/net_smtp from 1.11.1 to 1.12.1.
+* Updated mck89/peast from v1.16.2 to 1.16.3.
 * Updated monolog/monolog from 2.9.2 to 2.9.3.
 * Updated symfony/yaml from 5.4.35 to 5.4.45.
-* Updated OOUI from v0.49.1 to v0.51.1.
+* Updated OOUI from v0.49.1 to v0.51.2.
 * Updated wikimedia/at-ease from 2.1.0 to 3.0.0.
 * Updated wikimedia/json-codec from 3.0.1 to 3.0.3.
-* Updated wikimedia/less.php from 4.2.1 to 5.1.1.
+* Updated wikimedia/less.php from 4.2.1 to 5.1.2.
 * Updated wikimedia/minify from 2.7.0 to 2.8.0.
+* Updated wikimedia/normalized-exception from 1.0.1 to 2.0.0.
 * Updated wikimedia/php-session-serializer from 2.0.1 to 3.0.0.
+* Updated wikimedia/purtle from 1.0.8 to 2.0.0.
+* Updated wikimedia/relpath from 4.0.0 to 4.0.1.
 * Updated wikimedia/remex-html from 4.1.0 to 4.1.1.
+* Updated wikimedia/request-timeout from 1.2.0 to 2.0.0.
 * Updated wikimedia/scoped-callback from 4.0.0 to 5.0.0.
 * Updated wikimedia/services from 3.0.0 to 4.0.0.
 * Updated wikimedia/shellbox from 4.0.2 to 4.1.1.
@@ -298,6 +303,7 @@ because of Phabricator reports.
 * (T356144) Deprecated the Kanuri language (kr) and replaced it
   with Central Kanuri (knc). The language code kr is kept for
   backwards compatibility and falls back to knc.
+* (T379137) Added language support for Hunde (hke).
 * …
 
 === Breaking changes in 1.43 ===
@@ -507,6 +513,10 @@ because of Phabricator reports.
 The bodyOnly=false option has now been removed, meaning this is no longer
 supported.
 * CentralIdLookup::factoryNonLocal(), deprecated since 1.37, has been removed.
+* CryptHKDF and MWCryptHKDF were removed without deprecation, in part because no
+  past or present use could be found. hash_hkdf() can be used instead of HKDF().
+  While generate() and generateHex() have no direct replacement, random_bytes()
+  and MWCryptRand::generateHex() can be used instead.
 * …
 
 === Deprecations in 1.43 ===

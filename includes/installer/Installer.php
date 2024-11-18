@@ -336,14 +336,14 @@ abstract class Installer {
 	 * The messages will be in wikitext format, which will be converted to an
 	 * output format such as HTML or text before being sent to the user.
 	 * @param string|MessageSpecifier $msg
-	 * @param mixed ...$params
+	 * @param string|int|float ...$params Message parameters
 	 */
 	abstract public function showMessage( $msg, ...$params );
 
 	/**
 	 * Same as showMessage(), but for displaying errors
 	 * @param string|MessageSpecifier $msg
-	 * @param mixed ...$params
+	 * @param string|int|float ...$params Message parameters
 	 */
 	abstract public function showError( $msg, ...$params );
 
@@ -406,7 +406,14 @@ abstract class Installer {
 		$installerConfig = self::getInstallerConfig( $defaultConfig );
 
 		// Disable all storage services, since we don't have any configuration yet!
-		$this->resetMediaWikiServices( $installerConfig );
+		$lang = $this->getVar( '_UserLang', 'en' );
+		$services = self::disableStorage( $installerConfig, $lang );
+
+		// Set up ParserOptions
+		$user = RequestContext::getMain()->getUser();
+		$this->parserOptions = new ParserOptions( $user ); // language will be wrong :(
+		// Don't try to access DB before user language is initialised
+		$this->setParserLanguage( $services->getLanguageFactory()->getLanguage( 'en' ) );
 
 		$this->settings = $this->getDefaultSettings();
 
@@ -496,19 +503,19 @@ abstract class Installer {
 	 * Reset the global service container and associated global state,
 	 * disabling storage, to support pre-installation operation.
 	 *
-	 * @param Config $installerConfig Config override
+	 * @param Config $config Config override
+	 * @param string $lang Language code
+	 * @return MediaWikiServices
 	 */
-	private function resetMediaWikiServices( Config $installerConfig ) {
+	public static function disableStorage( Config $config, string $lang ) {
 		global $wgObjectCaches, $wgLang;
 
 		// Reset all services and inject config overrides.
 		// Reload to re-enable Rdbms, in case of any prior MediaWikiServices::disableStorage()
-		MediaWikiServices::resetGlobalInstance( $installerConfig, 'reload' );
+		MediaWikiServices::resetGlobalInstance( $config, 'reload' );
 
 		$mwServices = MediaWikiServices::getInstance();
 		$mwServices->disableStorage();
-
-		$lang = $this->getVar( '_UserLang', 'en' );
 
 		// Disable i18n cache
 		$mwServices->getLocalisationCache()->disableBackend();
@@ -531,10 +538,7 @@ abstract class Installer {
 		// Disable object cache (otherwise CACHE_ANYTHING will try CACHE_DB and
 		// SqlBagOStuff will then throw since we just disabled wfGetDB)
 		$wgObjectCaches = $mwServices->getMainConfig()->get( MainConfigNames::ObjectCaches );
-
-		$this->parserOptions = new ParserOptions( $user ); // language will be wrong :(
-		// Don't try to access DB before user language is initialised
-		$this->setParserLanguage( $mwServices->getLanguageFactory()->getLanguage( 'en' ) );
+		return $mwServices;
 	}
 
 	/**
@@ -1417,7 +1421,7 @@ abstract class Installer {
 	protected function getTaskList() {
 		$taskList = new TaskList;
 		$taskFactory = $this->getTaskFactory();
-		$taskFactory->registerMainInstallerTasks( $taskList );
+		$taskFactory->registerMainTasks( $taskList, TaskFactory::PROFILE_INSTALLER );
 
 		// Add any steps added by overrides
 		foreach ( $this->extraInstallSteps as $requirement => $steps ) {
@@ -1453,7 +1457,8 @@ abstract class Installer {
 	public function performInstallation( $startCB, $endCB ) {
 		$tasks = $this->getTaskList();
 
-		$taskRunner = new TaskRunner( $tasks );
+		$taskRunner = new TaskRunner( $tasks, $this->getTaskFactory(),
+			TaskFactory::PROFILE_INSTALLER );
 		$taskRunner->addTaskStartListener( $startCB );
 		$taskRunner->addTaskEndListener( $endCB );
 

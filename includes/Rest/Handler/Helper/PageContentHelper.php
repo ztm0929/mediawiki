@@ -331,13 +331,29 @@ class PageContentHelper {
 				Handler::PARAM_SOURCE => 'path',
 				ParamValidator::PARAM_TYPE => 'string',
 				ParamValidator::PARAM_REQUIRED => true,
+				Handler::PARAM_DESCRIPTION => new MessageValue( 'rest-param-desc-page-content-title' ),
 			],
 			'redirect' => [
 				Handler::PARAM_SOURCE => 'query',
-				ParamValidator::PARAM_TYPE => [ 'no' ],
+				ParamValidator::PARAM_TYPE => 'boolean',
 				ParamValidator::PARAM_REQUIRED => false,
+				ParamValidator::PARAM_DEFAULT => true,
+				Handler::PARAM_DESCRIPTION => new MessageValue( 'rest-param-desc-page-content-redirect' ),
 			]
 		];
+	}
+
+	/**
+	 * Whether the handler is allowed to follow redirects, according to the
+	 * request parameters.
+	 *
+	 * Handlers that can follow wiki redirects can use this to give clients
+	 * control over the redirect handling behavior.
+	 *
+	 * @return bool
+	 */
+	public function getRedirectsAllowed(): bool {
+		return $this->parameters['redirect'] ?? true;
 	}
 
 	/**

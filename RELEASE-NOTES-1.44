@@ -70,7 +70,7 @@ For notes on 1.43.x and older releases, see HISTORY.
 ==== Changed external libraries ====
 
 * Updated codex, codex-design-tokens and codex-icons
-  from v1.14.0 to v1.15.0.
+  from v1.14.0 to v1.16.0.
 * Updated wikimedia/bcp-47-code from 2.0.0 to 2.0.1.
 * Updated wikimedia/timestamp from 4.1.1 to 4.2.0.
 * …
@@ -113,10 +113,8 @@ because of Phabricator reports.
   instead (T358779).
 * The ParsoidOutputAccess class marked @unstable from creation and
   deprecated with all of its methods in 1.43, has been removed.
-* CryptHKDF and MWCryptHKDF were removed without deprecation, in part because no
-  past or present use could be found. hash_hkdf() can be used instead of HKDF().
-  While generate() and generateHex() have no direct replacement, random_bytes()
-  and MWCryptRand::generateHex() can be used instead.
+* IDatabase::onAtomicSectionCancel() has been removed without deprecation
+  as it's completely unused.
 * …
 
 === Deprecations in 1.44 ===
@@ -128,11 +126,16 @@ because of Phabricator reports.
   listExplicitlyDefinedTags(), listSoftwareActivatedTags(),
   listSoftwareDefinedTags(), makeTagSummarySubquery(), modifyDisplayQuery(),
   purgeTagCacheAll(), tagUsageStatistics(), and updateTags().
-* PageUpdater::setUsePageCreationLog() is deprecated and emitting warnings.
-  Use setFlags( EDIT_SUPPRESS_RC ) instead.
+* Maintenance::beginTransaction(), Maintenance::commitTransaction(),
+  Maintenance::rollbackTransaction(), and Maintenance::waitForReplication()
+  are now deprecated. Use Maintenance::*TransactionRound() instead.
 * ...
+* …
 
 === Other changes in 1.44 ===
+* The ArticleProtect and ArticleProtectComplete hooks are now called when
+  WikiPage::doUpdateRestrictions is called to protect a non-existing
+  title.
 * …
 
 == Compatibility ==

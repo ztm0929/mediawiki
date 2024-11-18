@@ -22,11 +22,11 @@ use MediaWiki\Config\ServiceOptions;
 use MediaWiki\Content\Content;
 use MediaWiki\Context\RequestContext;
 use MediaWiki\Deferred\DeferredUpdates;
-use MediaWiki\Deferred\MessageCacheUpdate;
 use MediaWiki\HookContainer\HookContainer;
 use MediaWiki\HookContainer\HookRunner;
 use MediaWiki\Language\ILanguageConverter;
 use MediaWiki\Language\Language;
+use MediaWiki\Language\MessageCacheUpdate;
 use MediaWiki\Languages\LanguageConverterFactory;
 use MediaWiki\Languages\LanguageFactory;
 use MediaWiki\Languages\LanguageFallback;
@@ -1493,11 +1493,44 @@ class MessageCache implements LoggerAwareInterface {
 
 	/**
 	 * @param string $text
+	 * @param PageReference $contextPage
+	 * @param bool $interface Whether this is an interface message
+	 * @param Language|StubUserLang|string|null $language Language code
+	 * @return ParserOutput
+	 * @internal
+	 */
+	public function parseWithPostprocessing(
+		string $text, PageReference $contextPage, bool $interface = false,
+		$language = null
+	): ParserOutput {
+		$options = [
+			'allowTOC' => false,
+			'enableSectionEditLinks' => false,
+			// Wrapping messages in an extra <div> is probably not expected. If
+			// they're outside the content area they probably shouldn't be
+			// targeted by CSS that's targeting the parser output, and if
+			// they're inside they already are from the outer div.
+			'unwrap' => true,
+			'userLang' => $language,
+		];
+		$po = $this->inParser ?
+			// Don't allow recursive parse; just return the wikitext as-is
+			new ParserOutput( htmlspecialchars( $text ) ) :
+			// Parse $text to yield a ParserOutput
+			$this->parse( $text, $contextPage, true, $interface, $language );
+		// Run the post-processing pipeline
+		return MediaWikiServices::getInstance()->getDefaultOutputPipeline()
+				->run( $po, $this->getParserOptions(), $options );
+	}
+
+	/**
+	 * @param string $text
 	 * @param PageReference|null $page
 	 * @param bool $linestart Whether this is at the start of a line
 	 * @param bool $interface Whether this is an interface message
 	 * @param Language|StubUserLang|string|null $language Language code
 	 * @return ParserOutput|string
+	 *
 	 */
 	public function parse( $text, ?PageReference $page = null, $linestart = true,
 		$interface = false, $language = null
@@ -1506,6 +1539,7 @@ class MessageCache implements LoggerAwareInterface {
 		global $wgTitle;
 
 		if ( $this->inParser ) {
+			wfDeprecated( __METHOD__ . ': when already in parser, returning a string' );
 			return htmlspecialchars( $text );
 		}
 

@@ -29,7 +29,7 @@
 					{{ util.formatTimestamp( item.timestamp ) }}
 				</span>
 			</template>
-			<template v-if="blockLogType === 'recent'" #item-type="{ item }">
+			<template v-if="blockLogType !== 'active'" #item-type="{ item }">
 				{{ util.getBlockActionMessage( item ) }}
 			</template>
 			<template v-if="blockLogType === 'active'" #item-target="{ item }">
@@ -85,7 +85,7 @@
 		</cdx-table>
 		<div v-if="moreBlocks" class="mw-block-log-fulllog">
 			<a
-				:href="mw.util.getUrl( 'Special:Log', { page: targetUser, type: 'block' } )"
+				:href="mw.util.getUrl( 'Special:Log', { page: 'User:' + targetUser, type: blockLogType === 'suppress' ? 'suppress' : 'block' } )"
 			>
 				{{ $i18n( 'log-fulllog' ).text() }}
 			</a>
@@ -125,7 +125,7 @@ module.exports = exports = defineComponent( {
 
 		const columns = [
 			{ id: 'timestamp', label: mw.message( 'blocklist-timestamp' ).text(), minWidth: '112px' },
-			props.blockLogType === 'recent' ?
+			props.blockLogType === 'recent' || props.blockLogType === 'suppress' ?
 				{ id: 'type', label: mw.message( 'blocklist-type-header' ).text(), minWidth: '112px' } :
 				{ id: 'target', label: mw.message( 'blocklist-target' ).text(), minWidth: '200px' },
 			{ id: 'expiry', label: mw.message( 'blocklist-expiry' ).text(), minWidth: '112px' },
@@ -141,9 +141,16 @@ module.exports = exports = defineComponent( {
 		const selection = ref( null );
 
 		const logEntries = ref( [] );
-		const logEntriesCount = ref( 0 );
 		const moreBlocks = ref( false );
 		const FETCH_LIMIT = 10;
+
+		const logEntriesCount = computed( () => {
+			if ( moreBlocks.value ) {
+				return mw.msg( 'block-user-label-count-exceeds-limit',
+					mw.language.convertNumber( FETCH_LIMIT ) );
+			}
+			return mw.language.convertNumber( logEntries.value.length );
+		} );
 
 		const infoChipIcon = computed( () => props.blockLogType === 'recent' ? cdxIconClock : cdxIconAlert );
 
@@ -186,6 +193,10 @@ module.exports = exports = defineComponent( {
 						// The fallback is only necessary for Jest tests.
 						data = data || { logevents: [] };
 						for ( let i = 0; i < data.logevents.length; i++ ) {
+							// Only show 'suppress' entries that are of a relevant action/subtype.
+							if ( data.logevents[ i ].type === 'suppress' && !data.logevents[ i ].action.endsWith( 'block' ) ) {
+								continue;
+							}
 							newData.push( {
 								timestamp: {
 									timestamp: data.logevents[ i ].timestamp,
@@ -219,13 +230,6 @@ module.exports = exports = defineComponent( {
 								reason: data.blocks[ i ].reason
 							} );
 						}
-					}
-
-					// Update count for the infochip
-					if ( moreBlocks.value ) {
-						logEntriesCount.value = mw.msg( 'block-user-label-count-exceeds-limit', FETCH_LIMIT );
-					} else {
-						logEntriesCount.value = newData.length;
 					}
 
 					logEntries.value = newData;

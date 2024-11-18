@@ -12,13 +12,11 @@ use MediaWiki\Json\FormatJson;
 use MediaWiki\Message\Message;
 use MediaWiki\Page\PageIdentityValue;
 use MediaWiki\Parser\ParserOptions;
-use MediaWiki\RecentChanges\ChangeTrackingEventIngress;
 use MediaWiki\Revision\RenderedRevision;
 use MediaWiki\Revision\RevisionRecord;
 use MediaWiki\Revision\SlotRecord;
 use MediaWiki\Status\Status;
 use MediaWiki\Storage\EditResult;
-use MediaWiki\Storage\PageUpdatedEvent;
 use MediaWiki\Title\Title;
 use MediaWiki\User\User;
 use MediaWiki\User\UserIdentity;
@@ -314,6 +312,53 @@ class PageUpdaterTest extends MediaWikiIntegrationTestCase {
 		$this->assertNotNull( $stats, 'site_stats' );
 		$this->assertSame( $oldStats->ss_total_pages + 0, (int)$stats->ss_total_pages );
 		$this->assertSame( $oldStats->ss_total_edits + 2, (int)$stats->ss_total_edits );
+	}
+
+	/**
+	 * Regression test for T379152
+	 * @covers \MediaWiki\Storage\PageUpdater::saveRevision()
+	 */
+	public function testRevisionFromEditComplete() {
+		$user = $this->getTestUser()->getUser();
+		$wikiPageFactory = $this->getServiceContainer()->getWikiPageFactory();
+		$tagsStore = $this->getServiceContainer()->getChangeTagsStore();
+
+		$this->setTemporaryHook(
+			'RevisionFromEditComplete',
+			static function ( $wikiPage, $rev, $originalRevId, $user, &$tags ) {
+				$tags[] = ( $rev->getParentId() ? 'test_updated' : 'test_created' );
+			}
+		);
+
+		$title = $this->getDummyTitle( __METHOD__ );
+		$page = $wikiPageFactory->newFromTitle( $title );
+		$updater = $page->newPageUpdater( $user );
+
+		$content = new TextContent( 'Lorem Ipsum' );
+		$updater->setContent( SlotRecord::MAIN, $content );
+
+		$summary = CommentStoreComment::newUnsavedComment( 'Just a test' );
+		$rev = $updater->saveRevision( $summary );
+
+		$this->assertArrayContains(
+			[ 'test_created' ],
+			$tagsStore->getTags( $this->getDb(), null, $rev->getId() )
+		);
+
+		// Now, try an update
+		$page = $wikiPageFactory->newFromTitle( $title );
+		$updater = $page->newPageUpdater( $user );
+
+		$content = new TextContent( 'Lorem Ipsum dolor sit amet' );
+		$updater->setContent( SlotRecord::MAIN, $content );
+
+		$summary = CommentStoreComment::newUnsavedComment( 'Next test' );
+		$rev = $updater->saveRevision( $summary );
+
+		$this->assertArrayContains(
+			[ 'test_updated' ],
+			$tagsStore->getTags( $this->getDb(), null, $rev->getId() )
+		);
 	}
 
 	public function testSetForceEmptyRevisionSetsOriginalRevisionId() {
@@ -902,19 +947,8 @@ class PageUpdaterTest extends MediaWikiIntegrationTestCase {
 
 	/**
 	 * @dataProvider provideSetUsePageCreationLog
-	 * @covers \MediaWiki\RecentChanges\ChangeTrackingEventIngress
 	 */
 	public function testSetUsePageCreationLog( $use, $expected ) {
-		$this->hideDeprecated( 'MediaWiki\Storage\PageUpdater::setUsePageCreationLog' );
-
-		$ingress = new ChangeTrackingEventIngress(
-			$this->getServiceContainer()->getChangeTagsStore(),
-			$this->getServiceContainer()->getUserEditTracker(),
-		);
-
-		$this->getServiceContainer()->getDomainEventSource()
-			->registerListener( PageUpdatedEvent::TYPE, $ingress );
-
 		$user = $this->getTestUser()->getUser();
 
 		$title = $this->getDummyTitle( __METHOD__ . ( $use ? '_logged' : '_unlogged' ) );

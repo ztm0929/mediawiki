@@ -1215,7 +1215,7 @@ return [
 		'scripts' => 'resources/src/mediawiki.checkboxtoggle.js',
 	],
 	'mediawiki.checkboxtoggle.styles' => [
-		'styles' => 'resources/src/mediawiki.checkboxtoggle.styles.css',
+		'styles' => 'resources/src/mediawiki.checkboxtoggle.styles.less',
 	],
 	'mediawiki.cookie' => [
 		'localBasePath' => MW_INSTALL_PATH . '/resources/src/mediawiki.cookie',
@@ -2045,7 +2045,9 @@ return [
 		'remoteBasePath' => "$wgResourceBasePath/resources/src/mediawiki.special.apisandbox",
 		'styles' => 'apisandbox.less',
 		'packageFiles' => [
-			'apisandbox.js',
+			'init.js',
+			'ApiSandbox.js',
+			'ApiSandboxLayout.js',
 			'OptionalParamWidget.js',
 			'ParamLabelWidget.js',
 			'BooleanToggleSwitchParamWidget.js',
@@ -2054,6 +2056,7 @@ return [
 			'PasswordParamWidget.js',
 			'UploadSelectFileParamWidget.js',
 			'TextParamMixin.js',
+			'Util.js',
 			'UtilMixin.js',
 		],
 		'dependencies' => [

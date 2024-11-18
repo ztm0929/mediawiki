@@ -63,7 +63,6 @@ use Wikimedia\Parsoid\Core\PageBundle;
 use Wikimedia\Parsoid\Core\ResourceLimitExceededException;
 use Wikimedia\Parsoid\DOM\Element;
 use Wikimedia\Parsoid\Parsoid;
-use Wikimedia\Parsoid\Utils\ContentUtils;
 use Wikimedia\Parsoid\Utils\DOMCompat;
 use Wikimedia\Parsoid\Utils\DOMUtils;
 use Wikimedia\Parsoid\Utils\WTUtils;
@@ -539,10 +538,7 @@ class HtmlOutputRendererHelper implements HtmlOutputHelper {
 			$pb = $this->getPageBundle();
 
 			// Inject data-parsoid and data-mw attributes.
-			// XXX: Would be nice if we had a DOM handy.
-			$doc = DOMUtils::parseHTML( $parserOutput->getRawText() );
-			PageBundle::apply( $doc, $pb );
-			$parserOutput->setRawText( ContentUtils::toXML( $doc ) );
+			$parserOutput->setRawText( $pb->toInlineAttributeHtml() );
 		}
 
 		// Check if variant conversion has to be performed
@@ -598,12 +594,14 @@ class HtmlOutputRendererHelper implements HtmlOutputHelper {
 				ParamValidator::PARAM_TYPE => 'boolean',
 				ParamValidator::PARAM_DEFAULT => false,
 				ParamValidator::PARAM_REQUIRED => false,
+				Handler::PARAM_DESCRIPTION => new MessageValue( 'rest-param-desc-html-output-stash' )
 			],
 			'flavor' => [
 				Handler::PARAM_SOURCE => 'query',
 				ParamValidator::PARAM_TYPE => self::OUTPUT_FLAVORS,
 				ParamValidator::PARAM_DEFAULT => 'view',
 				ParamValidator::PARAM_REQUIRED => false,
+				Handler::PARAM_DESCRIPTION => new MessageValue( 'rest-param-desc-html-output-flavor' )
 			],
 		];
 	}
