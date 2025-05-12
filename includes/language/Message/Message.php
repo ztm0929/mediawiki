@@ -26,6 +26,7 @@ use MediaWiki\Content\Content;
 use MediaWiki\Context\IContextSource;
 use MediaWiki\Context\RequestContext;
 use MediaWiki\Language\Language;
+use MediaWiki\Language\MessageInfo;
 use MediaWiki\Language\RawMessage;
 use MediaWiki\Logger\LoggerFactory;
 use MediaWiki\MainConfigNames;
@@ -34,6 +35,7 @@ use MediaWiki\Page\PageReference;
 use MediaWiki\Page\PageReferenceValue;
 use MediaWiki\Parser\Parser;
 use MediaWiki\Parser\ParserOutput;
+use MediaWiki\Parser\Sanitizer;
 use MediaWiki\StubObject\StubUserLang;
 use MediaWiki\Title\Title;
 use RuntimeException;
@@ -86,7 +88,7 @@ use Wikimedia\Message\ScalarParam;
  * Fetching a message text for interface message:
  *
  * @code
- *    $button = Xml::button(
+ *    $button = Html::submitButton(
  *         $context->msg( 'submit' )->text()
  *    );
  * @endcode
@@ -186,15 +188,24 @@ class Message implements Stringable, MessageSpecifier, Serializable {
 	/**
 	 * In which language to get this message. Overrides the $interface setting.
 	 *
-	 * @var Language|null Explicit language object, or null for user language
+	 * @var Language|string|null Explicit language object, a MediaWiki internal language code as a string,
+	 *   or null for user language
 	 */
-	protected ?Language $language = null;
+	protected $language = null;
 
 	/**
 	 * @var callable|null A callable which returns the current user language,
 	 *   or null to get it from global state.
 	 */
 	protected $userLangCallback;
+
+	/**
+	 * If the message was fetched via a fallback sequence from a language other
+	 * than the requested one, this will be the final language code.
+	 *
+	 * @var string|null
+	 */
+	protected $fetchedLangCode;
 
 	/**
 	 * @var string The message key. If $keysToTry has more than one element,
@@ -299,18 +310,16 @@ class Message implements Stringable, MessageSpecifier, Serializable {
 	public function __serialize() {
 		return [
 			'interface' => $this->isInterface,
-			'language' => $this->language ? $this->language->getCode() : null,
+			'language' => $this->language instanceof Language ? $this->language->getCode() : $this->language,
 			'key' => $this->key,
 			'keysToTry' => $this->keysToTry,
 			'parameters' => $this->parameters,
 			'useDatabase' => $this->useDatabase,
 			// Optimisation: Avoid cost of TitleFormatter on serialize,
-			// and especially cost of TitleParser (via Title::newFromText)
-			// on retrieval.
-			'titlevalue' => ( $this->contextPage
-				? [ 0 => $this->contextPage->getNamespace(), 1 => $this->contextPage->getDBkey() ]
-				: null
-			),
+			// and especially cost of TitleParser on retrieval.
+			'titlevalue' => $this->contextPage
+				? [ $this->contextPage->getNamespace(), $this->contextPage->getDBkey() ]
+				: null,
 		];
 	}
 
@@ -348,10 +357,8 @@ class Message implements Stringable, MessageSpecifier, Serializable {
 			}
 		}, $data['parameters'] );
 		$this->useDatabase = $data['useDatabase'];
-		$this->language = $data['language']
-			? MediaWikiServices::getInstance()->getLanguageFactory()
-				->getLanguage( $data['language'] )
-			: null;
+		// Until MW 1.39, we used 'false' instead of 'null' to indicate the user language (Idbe21afcea)
+		$this->language = $data['language'] ?: null;
 
 		// Since 1.35, the key 'titlevalue' is set, instead of 'titlestr'.
 		if ( isset( $data['titlevalue'] ) ) {
@@ -361,8 +368,14 @@ class Message implements Stringable, MessageSpecifier, Serializable {
 				PageReference::LOCAL
 			);
 		} elseif ( isset( $data['titlestr'] ) ) {
-			// TODO: figure out what's needed to remove this codepath
-			$this->contextPage = Title::newFromText( $data['titlestr'] );
+			$titleParser = MediaWikiServices::getInstance()->getTitleParser();
+			$title = $titleParser->parseTitle( $data['titlestr'] );
+			// The title should not have any fragment or interwiki parts
+			$this->contextPage = new PageReferenceValue(
+				$title->getNamespace(),
+				$title->getDBkey(),
+				PageReference::LOCAL
+			);
 		} else {
 			$this->contextPage = null;
 		}
@@ -399,7 +412,7 @@ class Message implements Stringable, MessageSpecifier, Serializable {
 	 *
 	 * @return string
 	 */
-	public function getKey() {
+	public function getKey(): string {
 		return $this->key;
 	}
 
@@ -410,7 +423,7 @@ class Message implements Stringable, MessageSpecifier, Serializable {
 	 *
 	 * @return (MessageParam|Message|string|int|float)[]
 	 */
-	public function getParams() {
+	public function getParams(): array {
 		return $this->parameters;
 	}
 
@@ -424,11 +437,43 @@ class Message implements Stringable, MessageSpecifier, Serializable {
 	public function getLanguage(): Language {
 		// Defaults to null which means current user language
 		if ( $this->language !== null ) {
-			return $this->language;
+			return MediaWikiServices::getInstance()->getLanguageFactory()->getLanguage( $this->language );
 		} elseif ( $this->userLangCallback ) {
 			return ( $this->userLangCallback )();
 		} else {
 			return RequestContext::getMain()->getLanguage();
+		}
+	}
+
+	/**
+	 * Get the language code of the Message
+	 * @return string
+	 * @since 1.44
+	 */
+	public function getLanguageCode(): string {
+		if ( $this->language instanceof Language ) {
+			return $this->language->getCode();
+		} elseif ( is_string( $this->language ) ) {
+			return $this->language;
+		} elseif ( $this->userLangCallback ) {
+			return ( $this->userLangCallback )()->getCode();
+		} else {
+			return RequestContext::getMain()->getLanguage()->getCode();
+		}
+	}
+
+	/**
+	 * Get the language in which the message was fetched, or the requested
+	 * language if it is not available. This allows us to transform messages
+	 * in the localisation of the source. (T268492)
+	 * @return Language
+	 */
+	protected function getFetchedLanguage(): Language {
+		if ( $this->fetchedLangCode ) {
+			return MediaWikiServices::getInstance()->getLanguageFactory()
+				->getLanguage( $this->fetchedLangCode );
+		} else {
+			return $this->getLanguage();
 		}
 	}
 
@@ -539,13 +584,13 @@ class Message implements Stringable, MessageSpecifier, Serializable {
 			MainConfigNames::ForceUIMsgAsContentMsg );
 
 		$contLang = MediaWikiServices::getInstance()->getContentLanguage();
-		$lang = $this->getLanguage();
+		$langCode = $this->getLanguageCode();
 		$title = $this->key;
 		if (
-			!$lang->equals( $contLang )
+			$langCode !== $contLang->getCode()
 			&& in_array( $this->key, (array)$forceUIMsgAsContentMsg )
 		) {
-			$title .= '/' . $lang->getCode();
+			$title .= '/' . $langCode;
 		}
 
 		// Don't use $contLang->ucfirst() here. See T362654
@@ -875,14 +920,14 @@ class Message implements Stringable, MessageSpecifier, Serializable {
 		} elseif ( $lang instanceof StubUserLang ) {
 			$this->language = null;
 		} elseif ( $lang instanceof Bcp47Code ) {
-			if ( $this->language === null || !$this->language->isSameCodeAs( $lang ) ) {
+			if ( !( $this->language instanceof Language && $this->language->isSameCodeAs( $lang ) ) ) {
 				$this->language = MediaWikiServices::getInstance()->getLanguageFactory()
 					->getLanguage( $lang );
 			}
 		} elseif ( is_string( $lang ) ) {
-			if ( $this->language === null || $this->language->getCode() != $lang ) {
+			if ( !( $this->language instanceof Language && $this->language->getCode() === $lang ) ) {
 				$this->language = MediaWikiServices::getInstance()->getLanguageFactory()
-					->getLanguage( $lang );
+					->getLanguageCode( $lang )->toString();
 			}
 		} else {
 			// Always throws. Moved here as an optimization.
@@ -1021,10 +1066,10 @@ class Message implements Stringable, MessageSpecifier, Serializable {
 			// '⧼' is used instead of '<' to side-step any
 			// double-escaping issues.
 			// (Keep synchronised with mw.Message#toString in JS.)
-			return '⧼' . htmlspecialchars( $this->key ) . '⧽';
+			return '⧼' . Sanitizer::escapeCombiningChar( htmlspecialchars( $this->key ) ) . '⧽';
 		}
 
-		if ( in_array( $this->getLanguage()->getCode(), [ 'qqx', 'x-xss' ] ) ) {
+		if ( in_array( $this->getLanguageCode(), [ 'qqx', 'x-xss' ] ) ) {
 			# Insert a list of alternative message keys for &uselang=qqx.
 			if ( $string === '($*)' ) {
 				$keylist = implode( ' / ', $this->keysToTry );
@@ -1058,6 +1103,7 @@ class Message implements Stringable, MessageSpecifier, Serializable {
 		} elseif ( $format === self::FORMAT_ESCAPED ) {
 			$string = $this->transformText( $string );
 			$string = htmlspecialchars( $string, ENT_QUOTES, 'UTF-8', false );
+			$string = Sanitizer::escapeCombiningChar( $string );
 		}
 
 		# Raw parameter replacement
@@ -1452,11 +1498,12 @@ class Message implements Stringable, MessageSpecifier, Serializable {
 	 * @return ParserOutput Wikitext parsed into HTML.
 	 */
 	protected function parseText( string $string ): ParserOutput {
-		$out = MediaWikiServices::getInstance()->getMessageCache()->parseWithPostprocessing(
+		$out = MediaWikiServices::getInstance()->getMessageParser()->parse(
 			$string,
 			$this->contextPage ?? PageReferenceValue::localReference( NS_SPECIAL, 'Badtitle/Message' ),
+			/*linestart*/ true,
 			$this->isInterface,
-			$this->getLanguage()
+			$this->getFetchedLanguage()
 		);
 
 		return $out;
@@ -1473,10 +1520,10 @@ class Message implements Stringable, MessageSpecifier, Serializable {
 	 * @return string Wikitext with {{-constructs substituted with its parsed result.
 	 */
 	protected function transformText( $string ) {
-		return MediaWikiServices::getInstance()->getMessageCache()->transform(
+		return MediaWikiServices::getInstance()->getMessageParser()->transform(
 			$string,
 			$this->isInterface,
-			$this->getLanguage(),
+			$this->getFetchedLanguage(),
 			$this->contextPage
 		);
 	}
@@ -1492,12 +1539,16 @@ class Message implements Stringable, MessageSpecifier, Serializable {
 		if ( $this->message === null ) {
 			$cache = MediaWikiServices::getInstance()->getMessageCache();
 
-			$usedKey = null;
+			$info = new MessageInfo;
+			$langCode = $this->getLanguageCode();
 			foreach ( $this->keysToTry as $key ) {
-				$message = $cache->get( $key, $this->useDatabase, $this->getLanguage(), $usedKey );
+				$message = $cache->get( $key, $this->useDatabase, $this->getLanguageCode(), $info );
 				if ( $message !== false && $message !== '' ) {
-					if ( $usedKey !== $key ) {
-						$this->overriddenKey = $usedKey;
+					if ( $info->usedKey && $info->usedKey !== $key ) {
+						$this->overriddenKey = $info->usedKey;
+					}
+					if ( $info->langCode && $info->langCode !== $langCode ) {
+						$this->fetchedLangCode = $info->langCode;
 					}
 					break;
 				}
@@ -1536,7 +1587,7 @@ class Message implements Stringable, MessageSpecifier, Serializable {
 			case self::FORMAT_BLOCK_PARSE:
 			case self::FORMAT_ESCAPED:
 			default:
-				return htmlspecialchars( $plaintext, ENT_QUOTES );
+				return Sanitizer::escapeCombiningChar( htmlspecialchars( $plaintext, ENT_QUOTES ) );
 		}
 	}
 

@@ -37,7 +37,6 @@ use MediaWiki\Config\HashConfig;
 use MediaWiki\Config\MultiConfig;
 use MediaWiki\Context\RequestContext;
 use MediaWiki\HookContainer\HookContainer;
-use MediaWiki\Installer\Task\RestoredServicesProvider;
 use MediaWiki\Installer\Task\TaskFactory;
 use MediaWiki\Installer\Task\TaskList;
 use MediaWiki\Installer\Task\TaskRunner;
@@ -200,6 +199,7 @@ abstract class Installer {
 		MainConfigNames::UpgradeKey,
 		MainConfigNames::DefaultSkin,
 		MainConfigNames::Pingback,
+		MainConfigNames::InstallerInitialPages,
 	];
 
 	/**
@@ -331,17 +331,40 @@ abstract class Installer {
 	private $taskFactory;
 
 	/**
-	 * UI interface for displaying a short message
-	 * The parameters are like parameters to wfMessage().
-	 * The messages will be in wikitext format, which will be converted to an
-	 * output format such as HTML or text before being sent to the user.
-	 * @param string|MessageSpecifier $msg
-	 * @param string|int|float ...$params Message parameters
+	 * Display a short neutral message
+	 *
+	 * @param string|MessageSpecifier $msg String of wikitext that will be converted
+	 *  to HTML, or interface message that will be parsed.
+	 * @param string|int|float ...$params Message parameters, same as wfMessage().
 	 */
 	abstract public function showMessage( $msg, ...$params );
 
 	/**
-	 * Same as showMessage(), but for displaying errors
+	 * Display a success message
+	 *
+	 * @param string|MessageSpecifier $msg String of wikitext that will be converted
+	 *  to HTML, or interface message that will be parsed.
+	 * @param string|int|float ...$params Message parameters, same as wfMessage().
+	 */
+	abstract public function showSuccess( $msg, ...$params );
+
+	/**
+	 * Display a warning message
+	 *
+	 * @param string|MessageSpecifier $msg String of wikitext that will be converted
+	 *  to HTML, or interface message that will be parsed.
+	 * @param string|int|float ...$params Message parameters, same as wfMessage().
+	 */
+	abstract public function showWarning( $msg, ...$params );
+
+	/**
+	 * Display an error message
+	 *
+	 * Avoid error fatigue in the installer. Use this only if something the
+	 * user expects has failed and requires intervention to continue.
+	 * If something non-essential failed that can be continued past with
+	 * no action, use a warning instead.
+	 *
 	 * @param string|MessageSpecifier $msg
 	 * @param string|int|float ...$params Message parameters
 	 */
@@ -349,7 +372,6 @@ abstract class Installer {
 
 	/**
 	 * Show a message to the installing user by using a Status object
-	 * @param Status $status
 	 */
 	abstract public function showStatusMessage( Status $status );
 
@@ -378,12 +400,6 @@ abstract class Installer {
 			] + $baseConfig->get( MainConfigNames::ObjectCaches );
 
 		$configOverrides->set( MainConfigNames::ObjectCaches, $objectCaches );
-
-		// Load the installer's i18n.
-		$messageDirs = $baseConfig->get( MainConfigNames::MessagesDirs );
-		$messageDirs['MediaWikiInstaller'] = __DIR__ . '/i18n';
-
-		$configOverrides->set( MainConfigNames::MessagesDirs, $messageDirs );
 
 		$installerConfig = new MultiConfig( [ $configOverrides, $baseConfig ] );
 
@@ -430,9 +446,6 @@ abstract class Installer {
 		$this->parserTitle = Title::newFromText( 'Installer' );
 	}
 
-	/**
-	 * @return array
-	 */
 	private function getDefaultSettings(): array {
 		global $wgLocaltimezone;
 
@@ -536,7 +549,7 @@ abstract class Installer {
 		$wgLang = RequestContext::getMain()->getLanguage();
 
 		// Disable object cache (otherwise CACHE_ANYTHING will try CACHE_DB and
-		// SqlBagOStuff will then throw since we just disabled wfGetDB)
+		// SqlBagOStuff will then throw since we just disabled database connections)
 		$wgObjectCaches = $mwServices->getMainConfig()->get( MainConfigNames::ObjectCaches );
 		return $mwServices;
 	}
@@ -1017,7 +1030,7 @@ abstract class Installer {
 		$safe = !$this->dirIsExecutable( $dir, $url );
 
 		if ( !$safe ) {
-			$this->showMessage( 'config-uploads-not-safe', $dir );
+			$this->showWarning( 'config-uploads-not-safe', $dir );
 		}
 
 		return true;
@@ -1045,14 +1058,14 @@ abstract class Installer {
 		}
 
 		if ( !$status || !$status->isGood() ) {
-			$this->showMessage( 'config-uploads-security-requesterror', 'X-Content-Type-Options: nosniff' );
+			$this->showWarning( 'config-uploads-security-requesterror', 'X-Content-Type-Options: nosniff' );
 			return true;
 		}
 
 		$headerValue = $req->getResponseHeader( 'X-Content-Type-Options' ) ?? '';
 		$responseList = Header::splitList( $headerValue );
 		if ( !in_array( 'nosniff', $responseList, true ) ) {
-			$this->showMessage( 'config-uploads-security-headers', 'X-Content-Type-Options: nosniff' );
+			$this->showWarning( 'config-uploads-security-headers', 'X-Content-Type-Options: nosniff' );
 		}
 
 		return true;
@@ -1436,7 +1449,7 @@ abstract class Installer {
 		return $taskList;
 	}
 
-	private function getTaskFactory() {
+	protected function getTaskFactory() {
 		if ( $this->taskFactory === null ) {
 			$this->taskFactory = new TaskFactory(
 				MediaWikiServices::getInstance()->getObjectFactory(),
@@ -1464,7 +1477,7 @@ abstract class Installer {
 
 		$status = $taskRunner->execute();
 		if ( $status->isOK() ) {
-			$this->showMessage(
+			$this->showSuccess(
 				'config-install-db-success'
 			);
 			$this->setVar( '_InstallDone', true );
@@ -1474,18 +1487,7 @@ abstract class Installer {
 	}
 
 	/**
-	 * Restore services that have been redefined in the early stage of installation
-	 */
-	protected function restoreServices() {
-		$provider = $this->getTaskFactory()->create(
-			[ 'class' => RestoredServicesProvider::class ] );
-		$provider->execute();
-	}
-
-	/**
 	 * Override the necessary bits of the config to run an installation.
-	 *
-	 * @param SettingsBuilder $settings
 	 */
 	public static function overrideConfig( SettingsBuilder $settings ) {
 		// Use PHP's built-in session handling, since MediaWiki's

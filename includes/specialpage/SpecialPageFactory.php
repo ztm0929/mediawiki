@@ -85,6 +85,7 @@ use MediaWiki\Specials\SpecialFileDuplicateSearch;
 use MediaWiki\Specials\SpecialFilepath;
 use MediaWiki\Specials\SpecialGoToInterwiki;
 use MediaWiki\Specials\SpecialImport;
+use MediaWiki\Specials\SpecialInterwiki;
 use MediaWiki\Specials\SpecialJavaScriptTest;
 use MediaWiki\Specials\SpecialLinkAccounts;
 use MediaWiki\Specials\SpecialLinkSearch;
@@ -512,12 +513,13 @@ class SpecialPageFactory {
 				'UserGroupManager',
 				'UserIdentityLookup',
 				'HideUserUtils',
+				'TempUserConfig',
 			]
 		],
 		'Block' => [
 			'class' => SpecialBlock::class,
 			'services' => [
-				'BlockUtils',
+				'BlockTargetFactory',
 				'BlockPermissionCheckerFactory',
 				'BlockUserFactory',
 				'DatabaseBlockStore',
@@ -525,14 +527,15 @@ class SpecialPageFactory {
 				'UserNamePrefixSearch',
 				'BlockActionInfo',
 				'TitleFormatter',
-				'NamespaceInfo'
+				'NamespaceInfo',
+				'UserOptionsLookup',
 			]
 		],
 		'Unblock' => [
 			'class' => SpecialUnblock::class,
 			'services' => [
 				'UnblockUserFactory',
-				'BlockUtils',
+				'BlockTargetFactory',
 				'DatabaseBlockStore',
 				'UserNameUtils',
 				'UserNamePrefixSearch',
@@ -547,10 +550,11 @@ class SpecialPageFactory {
 				'BlockRestrictionStore',
 				'ConnectionProvider',
 				'CommentStore',
-				'BlockUtils',
+				'BlockTargetFactory',
 				'HideUserUtils',
 				'BlockActionInfo',
 				'RowCommentFormatter',
+				'TempUserConfig',
 			],
 		],
 		'AutoblockList' => [
@@ -560,7 +564,7 @@ class SpecialPageFactory {
 				'BlockRestrictionStore',
 				'ConnectionProvider',
 				'CommentStore',
-				'BlockUtils',
+				'BlockTargetFactory',
 				'HideUserUtils',
 				'BlockActionInfo',
 				'RowCommentFormatter',
@@ -654,6 +658,7 @@ class SpecialPageFactory {
 				'UserGroupManager',
 				'UserIdentityLookup',
 				'HideUserUtils',
+				'TempUserConfig',
 			]
 		],
 		'Listadmins' => [
@@ -743,7 +748,7 @@ class SpecialPageFactory {
 			'class' => SpecialRecentChanges::class,
 			'services' => [
 				'WatchedItemStore',
-				'MessageCache',
+				'MessageParser',
 				'UserOptionsLookup',
 				'ChangeTagsStore',
 				'UserIdentityUtils',
@@ -754,7 +759,7 @@ class SpecialPageFactory {
 			'class' => SpecialRecentChangesLinked::class,
 			'services' => [
 				'WatchedItemStore',
-				'MessageCache',
+				'MessageParser',
 				'UserOptionsLookup',
 				'SearchEngineFactory',
 				'ChangeTagsStore',
@@ -778,7 +783,7 @@ class SpecialPageFactory {
 				'CommentStore',
 				'UserNameUtils',
 				'UserNamePrefixSearch',
-				'CommentFormatter',
+				'RowCommentFormatter',
 				'LinkBatchFactory',
 			]
 		],
@@ -841,6 +846,16 @@ class SpecialPageFactory {
 		// Data and tools
 		'ApiSandbox' => [
 			'class' => SpecialApiSandbox::class,
+		],
+		'Interwiki' => [
+			'class' => SpecialInterwiki::class,
+			'services' => [
+				'ContentLanguage',
+				'InterwikiLookup',
+				'LanguageNameUtils',
+				'UrlUtils',
+				'ConnectionProvider',
+			]
 		],
 		'RestSandbox' => [
 			'class' => SpecialRestSandbox::class,
@@ -1046,6 +1061,7 @@ class SpecialPageFactory {
 				'ConnectionProvider',
 				'RevisionStore',
 				'CommentFormatter',
+				'ChangeTagsStore',
 			]
 		],
 		'ExpandTemplates' => [
@@ -1223,12 +1239,11 @@ class SpecialPageFactory {
 			'class' => SpecialRenameUser::class,
 			'services' => [
 				'ConnectionProvider',
-				'MovePageFactory',
 				'PermissionManager',
 				'TitleFactory',
 				'UserFactory',
 				'UserNamePrefixSearch',
-				'UserNameUtils',
+				'RenameUserFactory',
 			]
 		],
 		'Revisiondelete' => [
@@ -1347,8 +1362,6 @@ class SpecialPageFactory {
 
 	/**
 	 * Get the special page list as an array
-	 *
-	 * @return array
 	 */
 	private function getPageList(): array {
 		if ( !is_array( $this->list ) ) {
@@ -1452,7 +1465,6 @@ class SpecialPageFactory {
 	 * Initialise and return the list of special page aliases. Returns an array where
 	 * the key is an alias, and the value is the canonical name of the special page.
 	 * All registered special pages are guaranteed to map to themselves.
-	 * @return array
 	 */
 	private function getAliasList(): array {
 		if ( $this->aliases === null ) {

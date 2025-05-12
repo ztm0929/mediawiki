@@ -26,7 +26,6 @@ namespace MediaWiki\Feed;
 use MediaWiki\Language\LanguageCode;
 use MediaWiki\MainConfigNames;
 use MediaWiki\MediaWikiServices;
-use MediaWiki\Title\Title;
 use MediaWiki\Utils\UrlUtils;
 
 /**
@@ -39,7 +38,7 @@ use MediaWiki\Utils\UrlUtils;
  * @ingroup Feed
  */
 class FeedItem {
-	/** @var Title */
+	/** @var string */
 	public $title;
 
 	/** @var string */
@@ -66,7 +65,7 @@ class FeedItem {
 	protected UrlUtils $urlUtils;
 
 	/**
-	 * @param string|Title $title Item's title
+	 * @param string $title Item's title
 	 * @param string $description
 	 * @param string $url URL uniquely designating the item.
 	 * @param string $date Item's date
@@ -98,6 +97,15 @@ class FeedItem {
 		$string = preg_replace( '/[\x00-\x08\x0b\x0c\x0e-\x1f]/', '', $string );
 
 		return htmlspecialchars( $string );
+	}
+
+	/**
+	 * Encode $string so that it can be safely embedded in a XML document,
+	 * returning `null` if $string was `null`.
+	 * @since 1.44 (also backported to 1.39.12, 1.42.6 and 1.43.1)
+	 */
+	public function xmlEncodeNullable( ?string $string ): ?string {
+		return $string !== null ? $this->xmlEncode( $string ) : null;
 	}
 
 	/**
@@ -248,6 +256,3 @@ class FeedItem {
 	}
 
 }
-
-/** @deprecated class alias since 1.40 */
-class_alias( FeedItem::class, 'FeedItem' );

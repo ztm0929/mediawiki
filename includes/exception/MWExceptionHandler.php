@@ -18,13 +18,16 @@
  * @file
  */
 
+namespace MediaWiki\Exception;
+
+use ErrorException;
 use MediaWiki\Debug\MWDebug;
 use MediaWiki\HookContainer\HookRunner;
-use MediaWiki\Json\FormatJson;
 use MediaWiki\Logger\LoggerFactory;
 use MediaWiki\MediaWikiServices;
 use MediaWiki\Request\WebRequest;
 use Psr\Log\LogLevel;
+use Throwable;
 use Wikimedia\NormalizedException\INormalizedException;
 use Wikimedia\Rdbms\DBError;
 use Wikimedia\Rdbms\DBQueryError;
@@ -121,7 +124,6 @@ class MWExceptionHandler {
 
 	/**
 	 * Report a throwable to the user
-	 * @param Throwable $e
 	 */
 	protected static function report( Throwable $e ) {
 		try {
@@ -259,6 +261,12 @@ class MWExceptionHandler {
 		$file = null,
 		$line = null
 	) {
+		// E_STRICT is deprecated since PHP 8.4 (T375707).
+		// phpcs:ignore Generic.PHP.NoSilencedErrors.Discouraged
+		if ( defined( 'E_STRICT' ) && $level == @constant( 'E_STRICT' ) ) {
+			$level = E_USER_NOTICE;
+		}
+
 		// Map PHP error constant to a PSR-3 severity level.
 		// Avoid use of "DEBUG" or "INFO" levels, unless the
 		// error should evade error monitoring and alerts.
@@ -293,10 +301,6 @@ class MWExceptionHandler {
 			case E_USER_WARNING:
 				// Used by wfWarn(), MWDebug::warning()
 				$prefix = 'PHP Warning: ';
-				$severity = LogLevel::WARNING;
-				break;
-			case E_STRICT:
-				$prefix = 'PHP Strict Standards: ';
 				$severity = LogLevel::WARNING;
 				break;
 			case E_DEPRECATED:
@@ -647,73 +651,6 @@ TXT;
 	}
 
 	/**
-	 * Serialize a Throwable object to JSON.
-	 *
-	 * The JSON object will have keys 'id', 'file', 'line', 'message', and
-	 * 'url'. These keys map to string values, with the exception of 'line',
-	 * which is a number, and 'url', which may be either a string URL or
-	 * null if the throwable did not occur in the context of serving a web
-	 * request.
-	 *
-	 * If $wgLogExceptionBacktrace is true, it will also have a 'backtrace'
-	 * key, mapped to the array return value of Throwable::getTrace, but with
-	 * each element in each frame's "args" array (if set) replaced with the
-	 * argument's class name (if the argument is an object) or type name (if
-	 * the argument is a PHP primitive).
-	 *
-	 * @par Sample JSON record ($wgLogExceptionBacktrace = false):
-	 * @code
-	 *  {
-	 *    "id": "c41fb419",
-	 *    "type": "Exception",
-	 *    "file": "/var/www/mediawiki/includes/cache/MessageCache.php",
-	 *    "line": 704,
-	 *    "message": "Example message",
-	 *    "url": "/wiki/Main_Page"
-	 *  }
-	 * @endcode
-	 *
-	 * @par Sample JSON record ($wgLogExceptionBacktrace = true):
-	 * @code
-	 *  {
-	 *    "id": "dc457938",
-	 *    "type": "Exception",
-	 *    "file": "/var/www/mediawiki/includes/cache/MessageCache.php",
-	 *    "line": 704,
-	 *    "message": "Example message",
-	 *    "url": "/wiki/Main_Page",
-	 *    "backtrace": [{
-	 *      "file": "/var/www/mediawiki/includes/OutputPage.php",
-	 *      "line": 80,
-	 *      "function": "get",
-	 *      "class": "MessageCache",
-	 *      "type": "->",
-	 *      "args": ["array"]
-	 *    }]
-	 *  }
-	 * @endcode
-	 *
-	 * @since 1.23
-	 * @param Throwable $e
-	 * @param bool $pretty Add non-significant whitespace to improve readability (default: false).
-	 * @param int $escaping Bitfield consisting of FormatJson::.*_OK class constants.
-	 * @param string $catcher CAUGHT_BY_* class constant indicating what caught the error
-	 * @return string|false JSON string if successful; false upon failure
-	 */
-	public static function jsonSerializeException(
-		Throwable $e,
-		$pretty = false,
-		$escaping = 0,
-		$catcher = self::CAUGHT_BY_OTHER
-	) {
-		return FormatJson::encode(
-			self::getStructuredExceptionData( $e, $catcher ),
-			$pretty,
-			$escaping
-		);
-	}
-
-	/**
 	 * Log a throwable to the exception log (if enabled).
 	 *
 	 * This method must not assume the throwable is an MWException,
@@ -739,12 +676,6 @@ TXT;
 				self::getLogNormalMessage( $e ),
 				$context
 			);
-
-			$json = self::jsonSerializeException( $e, false, FormatJson::ALL_OK, $catcher );
-			if ( $json !== false ) {
-				$logger = LoggerFactory::getInstance( 'exception-json' );
-				$logger->error( $json, [ 'private' => true ] );
-			}
 
 			self::callLogExceptionHook( $e, false );
 		}
@@ -793,6 +724,14 @@ TXT;
 	 */
 	private static function callLogExceptionHook( Throwable $e, bool $suppressed ) {
 		try {
+			// It's possible for the exception handler to be triggered during service container
+			// initialization, e.g. if an autoloaded file triggers deprecation warnings.
+			// To avoid a difficult-to-debug autoload loop, avoid attempting to initialize the service
+			// container here. (T380456).
+			if ( !MediaWikiServices::hasInstance() ) {
+				return;
+			}
+
 			( new HookRunner( MediaWikiServices::getInstance()->getHookContainer() ) )
 				->onLogException( $e, $suppressed );
 		} catch ( RecursiveServiceDependencyException $e ) {
@@ -800,3 +739,6 @@ TXT;
 		}
 	}
 }
+
+/** @deprecated class alias since 1.44 */
+class_alias( MWExceptionHandler::class, 'MWExceptionHandler' );

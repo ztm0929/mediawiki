@@ -19,6 +19,9 @@
  * @author Nokib Sarkar
  * @author Haoreima
  */
+
+use MediaWiki\Language\ReplacementArray;
+
 /**
  * Meitei specific converter routines.
  *
@@ -137,12 +140,12 @@ class MniConverter extends LanguageConverterSpecific {
 		self::NUMERALS +
 		self::MTEI_TO_BENG_MAP_EXTRA;
 
-	private function isBeginning( $position, $text ) {
+	private function isBeginning( int $position, string $text ): bool {
 		$at_first = $position === 0;
 		return $at_first || preg_match( self::NON_WORD_CHARACTER_PATTERN, $text[$position - 1] );
 	}
 
-	private function isEndOfWord( $char ) {
+	private function isEndOfWord( string $char ): bool {
 		if ( $char === self::PERIOD ) {
 			return true;
 		}
@@ -150,7 +153,7 @@ class MniConverter extends LanguageConverterSpecific {
 		return count( $matches ) > 0;
 	}
 
-	private function mteiToBengali( $text ) {
+	private function mteiToBengali( string $text ): iterable {
 		$chars = mb_str_split( $text );
 		$l = count( $chars );
 		$i = 0;

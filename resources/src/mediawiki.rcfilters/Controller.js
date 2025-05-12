@@ -431,9 +431,9 @@ Controller.prototype.addNumberValuesToGroup = function ( groupData, arbitraryVal
 			// the data
 			( !groupData.validate || groupData.validate( val ) ) &&
 			// but if that value isn't already in the definition
-			groupData.filters
+			!groupData.filters
 				.map( ( filterData ) => String( filterData.name ) )
-				.indexOf( String( val ) ) === -1
+				.includes( String( val ) )
 		) {
 			// Add the filter information
 			groupData.filters.push( this._createFilterDataFromNumber(
@@ -1042,13 +1042,13 @@ Controller.prototype._getDefaultParams = function () {
  * @return {jQuery.Promise} Promise object resolved with { content, status }
  */
 Controller.prototype._queryChangesList = function ( counterId, params ) {
-	const uri = this.uriProcessor.getUpdatedUri(),
+	const url = this.uriProcessor.getUpdatedUri(),
 		stickyParams = this.filtersModel.getStickyParamsValues();
 
 	params = params || {};
 	params.action = 'render'; // bypasses MW chrome
 
-	uri.extend( params );
+	Object.keys( params ).forEach( ( key ) => url.searchParams.set( key, params[ key ] ) );
 
 	this.requestCounter[ counterId ] = this.requestCounter[ counterId ] || 0;
 	const requestId = ++this.requestCounter[ counterId ];
@@ -1062,9 +1062,9 @@ Controller.prototype._queryChangesList = function ( counterId, params ) {
 	// be normalized out) the sticky parameters are
 	// always being sent to the server with their
 	// current/default values
-	uri.extend( stickyParams );
+	Object.keys( stickyParams ).forEach( ( key ) => url.searchParams.set( key, stickyParams[ key ] ) );
 
-	return $.ajax( uri.toString() )
+	return $.ajax( url.toString() )
 		.then(
 			( content, message, jqXHR ) => {
 				if ( !latestRequest() ) {

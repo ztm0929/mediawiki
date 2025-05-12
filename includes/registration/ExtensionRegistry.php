@@ -6,9 +6,11 @@ use AutoLoader;
 use Composer\Semver\Semver;
 use InvalidArgumentException;
 use LogicException;
+use MediaWiki\DomainEvent\DomainEventSource;
+use MediaWiki\DomainEvent\DomainEventSubscriber;
+use MediaWiki\Exception\ShellDisabledError;
 use MediaWiki\Settings\SettingsBuilder;
 use MediaWiki\Shell\Shell;
-use MediaWiki\ShellDisabledError;
 use MediaWiki\WikiMap\WikiMap;
 use ObjectCacheFactory;
 use RuntimeException;
@@ -30,7 +32,7 @@ use Wikimedia\ScopedCallback;
  * @ingroup ExtensionRegistry
  * @since 1.25
  */
-class ExtensionRegistry {
+class ExtensionRegistry implements DomainEventSubscriber {
 
 	/**
 	 * "requires" key that applies to MediaWiki core
@@ -157,9 +159,6 @@ class ExtensionRegistry {
 	 */
 	private $cache = null;
 
-	/**
-	 * @var ?SettingsBuilder
-	 */
 	private ?SettingsBuilder $settingsBuilder = null;
 
 	private static bool $accessDisabledForUnitTests = false;
@@ -271,7 +270,7 @@ class ExtensionRegistry {
 		return $this->cache;
 	}
 
-	private function makeCacheKey( BagOStuff $cache, $component, ...$extra ) {
+	private function makeCacheKey( BagOStuff $cache, string $component, string ...$extra ): string {
 		// Allow reusing cached ExtensionRegistry metadata between wikis (T274648)
 		return $cache->makeGlobalKey(
 			"registration-$component",
@@ -628,28 +627,16 @@ class ExtensionRegistry {
 	}
 
 	/**
-	 * Returns all registered listeners for the given event type,
-	 * in a form acceptable for use with DomainEventSource::registerListener().
+	 * Register any domain event subscribers defined by extensions.
 	 *
 	 * @internal
-	 *
-	 * @return array[]
 	 */
-	public function getDomainEventListeners( string $eventType ): array {
-		$listeners = $this->getAttribute( 'Listeners' );
-		return $listeners[$eventType] ?? [];
-	}
+	public function registerListeners( DomainEventSource $eventSource ): void {
+		$subscribers = $this->getAttribute( 'DomainEventIngresses' );
 
-	/**
-	 * Returns the names of all domain events for which getDomainEventListeners()
-	 * can return listeners.
-	 *
-	 * @internal
-	 *
-	 * @return string[]
-	 */
-	public function getDomainEventTypes(): array {
-		return array_keys( $this->getAttribute( 'Listeners' ) );
+		foreach ( $subscribers as $subscriber ) {
+			$eventSource->registerSubscriber( $subscriber );
+		}
 	}
 
 	/**

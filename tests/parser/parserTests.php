@@ -27,7 +27,6 @@
 require_once __DIR__ . '/../../maintenance/Maintenance.php';
 
 use MediaWiki\Maintenance\Maintenance;
-use MediaWiki\MediaWikiServices;
 use MediaWiki\Settings\SettingsBuilder;
 use MediaWiki\Specials\SpecialVersion;
 use MediaWiki\Tests\AnsiTermColorer;
@@ -35,7 +34,6 @@ use MediaWiki\Tests\DummyTermColorer;
 use Wikimedia\Parsoid\Utils\ScriptUtils;
 
 define( 'MW_AUTOLOAD_TEST_CLASSES', true );
-define( 'MW_PARSER_TEST', true );
 
 class ParserTestsMaintenance extends Maintenance {
 
@@ -51,7 +49,7 @@ class ParserTestsMaintenance extends Maintenance {
 			false, true );
 		$this->addOption( 'regex', 'Only run tests whose descriptions which match given regex',
 			false, true );
-		$this->addOption( 'filter', 'Alias for --regex', false, true );
+		$this->addOption( 'filter', 'Only run tests whose description contains the given string', false, true );
 		$this->addOption( 'file', 'Run test cases from a custom file instead of parserTests.txt',
 			false, true, false, true );
 		$this->addOption( 'dir', 'Run test cases for all *.txt files in a directory',
@@ -104,6 +102,9 @@ class ParserTestsMaintenance extends Maintenance {
 		$this->addOption( 'update-tests',
 			'Update parserTests.txt with results from wt2html fails.  Note that editTests.php exists ' .
 				'for finer grained editing of tests.' );
+		$this->addOption( 'update-unexpected',
+			'Update parserTests.txt with results from unexpected wt2html fails.'
+		);
 	}
 
 	public function finalSetup( SettingsBuilder $settingsBuilder ) {
@@ -116,18 +117,6 @@ class ParserTestsMaintenance extends Maintenance {
 	}
 
 	public function execute() {
-		global $wgDBtype;
-
-		// Cases of weird db corruption were encountered when running tests on earlyish
-		// versions of SQLite
-		if ( $wgDBtype == 'sqlite' ) {
-			$dbw = MediaWikiServices::getInstance()->getConnectionProvider()->getPrimaryDatabase();
-			$version = $dbw->getServerVersion();
-			if ( version_compare( $version, '3.6' ) < 0 ) {
-				die( "Parser tests require SQLite version 3.6 or later, you have $version\n" );
-			}
-		}
-
 		// Print out software version to assist with locating regressions
 		$version = SpecialVersion::getVersion( 'nodb' );
 		echo "This is MediaWiki version {$version}.\n\n";
@@ -150,7 +139,14 @@ class ParserTestsMaintenance extends Maintenance {
 		$record = $this->hasOption( 'record' );
 		$compare = $this->hasOption( 'compare' );
 
-		$regex = $this->getOption( 'filter', $this->getOption( 'regex', false ) );
+		if ( $this->hasOption( 'filter' ) ) {
+			$regex = preg_quote( $this->getOption( 'filter' ), '/' );
+			if ( $this->hasOption( 'regex' ) ) {
+				echo "Warning: --regex cannot be used with --filter, disabling --regexp\n";
+			}
+		} else {
+			$regex = $this->getOption( 'regex', false );
+		}
 		if ( $regex !== false ) {
 			$regex = "/$regex/i";
 
@@ -247,6 +243,7 @@ class ParserTestsMaintenance extends Maintenance {
 			'traceFlags' => $traceFlags,
 			'dumpFlags' => $dumpFlags,
 			'update-tests' => $this->hasOption( 'update-tests' ),
+			'update-unexpected' => $this->hasOption( 'update-unexpected' ),
 		] );
 
 		$ok = $tester->runTestsFromFiles( $files );

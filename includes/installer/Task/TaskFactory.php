@@ -12,6 +12,7 @@ use Wikimedia\ObjectFactory\ObjectFactory;
 class TaskFactory {
 	public const PROFILE_INSTALLER = 'installer';
 	public const PROFILE_ADD_WIKI = 'installPreConfigured';
+	public const PROFILE_WEB_UPGRADE = 'web-upgrade';
 
 	/**
 	 * This list is roughly in order of execution, although the declared
@@ -19,9 +20,9 @@ class TaskFactory {
 	 */
 	private const CORE_SPECS = [
 		[ 'class' => ExtensionsProvider::class, 'profile' => self::PROFILE_INSTALLER ],
-		[ 'class' => MysqlCreateDatabaseTask::class, 'db' => 'mysql' ],
+		[ 'class' => CreateDatabaseTask::class, 'db' => 'mysql' ],
 		[ 'class' => MysqlCreateUserTask::class, 'db' => 'mysql' ],
-		[ 'class' => PostgresCreateDatabaseTask::class, 'db' => 'postgres' ],
+		[ 'class' => CreateDatabaseTask::class, 'db' => 'postgres' ],
 		[ 'class' => PostgresCreateUserTask::class, 'db' => 'postgres' ],
 		[ 'class' => PostgresPlTask::class, 'db' => 'postgres' ],
 		[ 'class' => PostgresCreateSchemaTask::class, 'db' => 'postgres' ],
@@ -33,10 +34,17 @@ class TaskFactory {
 		[ 'class' => InsertUpdateKeysTask::class ],
 		[ 'class' => RestoredServicesProvider::class, 'profile' => self::PROFILE_INSTALLER ],
 		[ 'class' => AddWikiRestoredServicesProvider::class, 'profile' => self::PROFILE_ADD_WIKI ],
+		[ 'class' => CreateExternalDomainsTask::class, 'profile' => self::PROFILE_ADD_WIKI ],
 		[ 'class' => ExtensionTablesTask::class ],
 		[ 'class' => InitialContentTask::class ],
 		[ 'class' => CreateSysopTask::class, 'profile' => self::PROFILE_INSTALLER ],
 		[ 'class' => MailingListSubscribeTask::class, 'profile' => self::PROFILE_INSTALLER ],
+	];
+
+	private const WEB_UPGRADE_SPECS = [
+		[ 'class' => WebUpgradeExtensionsProvider::class ],
+		[ 'class' => RestoredServicesProvider::class ],
+		[ 'class' => WebUpgradeTask::class ],
 	];
 
 	/** @var ObjectFactory */
@@ -75,6 +83,10 @@ class TaskFactory {
 		$this->registerTasks( $list, $profile, $specs );
 	}
 
+	public function registerWebUpgradeTasks( TaskList $list ) {
+		$this->registerTasks( $list, self::PROFILE_WEB_UPGRADE, self::WEB_UPGRADE_SPECS );
+	}
+
 	/**
 	 * Register tasks from a spec array
 	 *
@@ -103,7 +115,9 @@ class TaskFactory {
 	 *   ObjectFactory spec and must contain "class" or "factory".
 	 *     - callback: A callable to call when the task is executed
 	 *     - name: The task name (callback only)
+	 *     - description: The task description (callback only)
 	 *     - after: A task or list of tasks that this task must run after (callback only)
+	 *     - postInstall: If true, the task will run after all install tasks (callback only)
 	 *     - class: The class name (ObjectFactory only)
 	 *     - factory: A factory function (ObjectFactory only)
 	 *     - args: Arguments to pass to the constructor (ObjectFactory only)
@@ -132,7 +146,7 @@ class TaskFactory {
 		return $task;
 	}
 
-	private function getCoreSchemaBasePath() {
-		return MW_INSTALL_PATH . '/maintenance';
+	private function getCoreSchemaBasePath(): string {
+		return MW_INSTALL_PATH . '/sql';
 	}
 }

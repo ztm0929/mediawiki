@@ -29,8 +29,6 @@ use JsonException;
 use MediaWiki\HookContainer\HookContainer;
 use MediaWiki\HookContainer\HookRunner;
 use MediaWiki\Json\JsonCodec;
-use MediaWiki\MainConfigNames;
-use MediaWiki\MediaWikiServices;
 use MediaWiki\Page\PageRecord;
 use MediaWiki\Page\WikiPageFactory;
 use MediaWiki\Title\TitleFactory;
@@ -285,6 +283,9 @@ class ParserCache {
 			$this->incrementStats( $page, 'miss', 'absent_metadata' );
 			$this->logger->debug( 'ParserOutput metadata cache miss', [ 'name' => $this->name ] );
 			return null;
+		} else {
+			// Ensure this cache hit is present in the in-process cache (T277829)
+			$this->metadataProcCache->set( $pageKey, $metadata );
 		}
 
 		// NOTE: If the value wasn't serialized to JSON when being stored,
@@ -316,19 +317,8 @@ class ParserCache {
 		return $metadata;
 	}
 
-	/**
-	 * @param PageRecord $page
-	 * @return string
-	 */
 	private function makeMetadataKey( PageRecord $page ): string {
-		$ratio = MediaWikiServices::getInstance()->getMainConfig()->get(
-			MainConfigNames::ParserCacheNewKeySchemaRatio
-		);
-		$configHash = hexdec( substr( md5( (string)$page->getId( PageRecord::LOCAL ) ), 0, 8 ) ) & 0x7fffffff;
-		if ( $ratio && ( $configHash % $ratio ) == 0 ) {
-			return $this->cache->makeKey( $this->name, $page->getId( PageRecord::LOCAL ), '|#|', 'idoptions' );
-		}
-		return $this->cache->makeKey( $this->name, 'idoptions', $page->getId( PageRecord::LOCAL ) );
+		return $this->cache->makeKey( $this->name, $page->getId( PageRecord::LOCAL ), '|#|', 'idoptions' );
 	}
 
 	/**
@@ -353,21 +343,10 @@ class ParserCache {
 		?array $usedOptions = null
 	): string {
 		$usedOptions ??= ParserOptions::allCacheVaryingOptions();
-		// idhash seem to mean 'page id' + 'rendering hash' (r3710)
-		$pageid = $page->getId( PageRecord::LOCAL );
 		$title = $this->titleFactory->newFromPageIdentity( $page );
 		$hash = $options->optionsHash( $usedOptions, $title );
-		$ratio = MediaWikiServices::getInstance()->getMainConfig()->get(
-			MainConfigNames::ParserCacheNewKeySchemaRatio
-		);
-		$configHash = hexdec( substr( md5( (string)$page->getId( PageRecord::LOCAL ) ), 0, 8 ) ) & 0x7fffffff;
-		if ( $ratio && ( $configHash % $ratio ) == 0 ) {
-			return $this->cache->makeKey( $this->name, $page->getId( PageRecord::LOCAL ), '|#|', 'idhash', $hash );
-		}
-		// Before T263581 ParserCache was split between normal page views
-		// and action=parse. -0 is left in the key to avoid invalidating the entire
-		// cache when removing the cache split.
-		return $this->cache->makeKey( $this->name, 'idhash', "{$pageid}-0!{$hash}" );
+		// idhash seem to mean 'page id' + 'rendering hash' (r3710)
+		return $this->cache->makeKey( $this->name, $page->getId( PageRecord::LOCAL ), '|#|', 'idhash', $hash );
 	}
 
 	/**
@@ -385,12 +364,6 @@ class ParserCache {
 
 		if ( !$page->exists() ) {
 			$this->incrementStats( $page, 'miss', 'nonexistent' );
-			return false;
-		}
-
-		if ( $page->isRedirect() ) {
-			// It's a redirect now
-			$this->incrementStats( $page, 'miss', 'redirect' );
 			return false;
 		}
 
@@ -471,6 +444,7 @@ class ParserCache {
 		$revId = null
 	) {
 		$page->assertWiki( PageRecord::LOCAL );
+
 		// T350538: Eventually we'll warn if the $cacheTime and $revId
 		// parameters are non-null here, since we *should* be getting
 		// them from the ParserOutput.

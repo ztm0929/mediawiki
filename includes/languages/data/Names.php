@@ -122,11 +122,14 @@ class Names {
 		'btm' => 'Batak Mandailing', # Batak Mandailing
 		'bto' => 'Iriga Bicolano', # Rinconada Bikol
 		'bug' => 'Basa Ugi', # Buginese
+		'bug-bugi' => 'ᨅᨔ ᨕᨘᨁᨗ', # Buginese (Buginese script), T389916
 		'bxr' => 'буряад', # Buryat (Russia)
 		'ca' => 'català', # Catalan
 		'cbk-zam' => 'Chavacano de Zamboanga', # Zamboanga Chavacano, T124657
 		'ccp' => '𑄌𑄋𑄴𑄟𑄳𑄦', # Chakma
-		'cdo' => '閩東語 / Mìng-dĕ̤ng-ngṳ̄', # Min-dong (multiple scripts - defaults to Latin)
+		'cdo' => '閩東語 / Mìng-dĕ̤ng-ngṳ̄', # Mindong (multiple scripts - defaults to Latin)
+		'cdo-hant' => '閩東語（傳統漢字）', # Mindong (Traditional Han script)
+		'cdo-latn' => 'Mìng-dĕ̤ng-ngṳ̄ (Bàng-uâ-cê)', # Mindong (Latin script)
 		'ce' => 'нохчийн', # Chechen
 		'ceb' => 'Cebuano', # Cebuano
 		'ch' => 'Chamoru', # Chamorro
@@ -136,6 +139,7 @@ class Names {
 		'chy' => 'Tsetsêhestâhese', # Cheyenne
 		'ckb' => 'کوردی', # Central Kurdish
 		'co' => 'corsu', # Corsican
+		'cop' => 'ϯⲙⲉⲧⲣⲉⲙⲛ̀ⲭⲏⲙⲓ', # Coptic
 		'cps' => 'Capiceño', # Capiznon
 		'cpx' => '莆仙語 / Pó-sing-gṳ̂', # Puxian (multiple scripts - defaults to Traditional Han)
 		'cpx-hans' => '莆仙语（简体）', # Puxian (Simplified Han script)
@@ -196,6 +200,7 @@ class Names {
 		'frp' => 'arpetan', # Franco-Provençal/Arpitan
 		'frr' => 'Nordfriisk', # North Frisian
 		'fur' => 'furlan', # Friulian
+		'fvr' => 'poor’íŋ belé’ŋ', # Fur
 		'fy' => 'Frysk', # Frisian
 		'ga' => 'Gaeilge', # Irish
 		'gaa' => 'Ga', # Ga
@@ -237,6 +242,7 @@ class Names {
 		'hke' => 'kihunde', # Hunde
 		'hno' => 'ہندکو', # Hindko
 		'ho' => 'Hiri Motu', # Hiri Motu
+		'hoc-latn' => 'Ho', # Ho (Latin script), T393086
 		'hr' => 'hrvatski', # Croatian
 		'hrx' => 'Hunsrik', # Riograndenser Hunsrückisch
 		'hsb' => 'hornjoserbsce', # Upper Sorbian
@@ -330,6 +336,7 @@ class Names {
 		'li' => 'Limburgs', # Limburgian
 		'lij' => 'Ligure', # Ligurian
 		'liv' => 'Līvõ kēļ', # Livonian
+		'ljp' => 'Lampung Api', # Lampung Api
 		'lki' => 'لەکی', # Laki
 		'lld' => 'Ladin', # Ladin
 		'lmo' => 'lombard', # Lombard - T283423
@@ -421,6 +428,7 @@ class Names {
 		'pag' => 'Pangasinan', # Pangasinan
 		'pam' => 'Kapampangan', # Pampanga
 		'pap' => 'Papiamentu', # Papiamentu
+		'pap-aw' => 'Papiamento (Aruba)', # Papiamento (Aruba), T387000
 		'pcd' => 'Picard', # Picard
 		'pcm' => 'Naijá', # Nigerian Pidgin
 		'pdc' => 'Deitsch', # Pennsylvania German
@@ -482,7 +490,7 @@ class Names {
 		'shi' => 'Taclḥit', # Tachelhit, Shilha (multiple scripts - defaults to Latin)
 		'shi-latn' => 'Taclḥit', # Tachelhit (Latin script)
 		'shi-tfng' => 'ⵜⴰⵛⵍⵃⵉⵜ', # Tachelhit (Tifinagh script)
-		'shn' => 'ၽႃႇသႃႇတႆး ', # Shan
+		'shn' => 'တႆး', # Shan
 		'shy' => 'tacawit', # Shawiya (Multiple scripts - defaults to Latin)
 		'shy-latn' => 'tacawit', # Shawiya (Latin script) - T194047
 		'si' => 'සිංහල', # Sinhalese
@@ -572,6 +580,7 @@ class Names {
 		'wal' => 'wolaytta', # Wolaytta
 		'war' => 'Winaray', # Waray-Waray
 		'wls' => 'Fakaʻuvea', # Wallisian
+		'wlx' => 'waale', # Wali
 		'wo' => 'Wolof', # Wolof
 		'wuu' => '吴语', # Wu (multiple scripts - defaults to Simplified Han)
 		'wuu-hans' => '吴语（简体）', # Wu (Simplified Han)

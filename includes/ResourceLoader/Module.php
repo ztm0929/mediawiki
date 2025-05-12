@@ -318,49 +318,6 @@ abstract class Module implements LoggerAwareInterface {
 	}
 
 	/**
-	 * Get alternative script URLs for legacy debug mode.
-	 *
-	 * The default behavior is to return a `load.php?only=scripts&module=<name>` URL.
-	 *
-	 * Module classes that merely wrap one or more other script files in production mode, may
-	 * override this method to return an array of raw URLs for those underlying scripts,
-	 * if those are individually web-accessible.
-	 *
-	 * The mw.loader client will load and execute each URL consecutively. This has the caveat of
-	 * executing legacy debug scripts in the global scope, which is why non-package file modules
-	 * tend to use file closures (T50886).
-	 *
-	 * This function MUST NOT be called, unless all the following are true:
-	 *
-	 * 1. We're in debug mode,
-	 * 2. There is no `only=` parameter in the context,
-	 * 3. self::supportsURLLoading() has returned true.
-	 *
-	 * Point 2 prevents an infinite loop since we use the `only=` mechanism in the return value.
-	 * Overrides must similarly return with `only`, or return or a non-load.php URL.
-	 *
-	 * @stable to override
-	 * @param Context $context
-	 * @return string[]
-	 */
-	public function getScriptURLsForDebug( Context $context ) {
-		$rl = $context->getResourceLoader();
-		$derivative = new DerivativeContext( $context );
-		$derivative->setModules( [ $this->getName() ] );
-		$derivative->setOnly( 'scripts' );
-
-		$url = $rl->createLoaderURL(
-			$this->getSource(),
-			$derivative
-		);
-
-		// Expand debug URL in case we are another wiki's module source (T255367)
-		$url = $rl->expandUrl( $this->getConfig()->get( MainConfigNames::Server ), $url );
-
-		return [ $url ];
-	}
-
-	/**
 	 * Whether this module supports URL loading. If this function returns false,
 	 * getScript() will be used even in cases (debug mode, no only param) where
 	 * getScriptURLsForDebug() would normally be used instead.
@@ -398,7 +355,6 @@ abstract class Module implements LoggerAwareInterface {
 	 * 2. There is no `only=` parameter and,
 	 * 3. self::supportsURLLoading() returns true.
 	 *
-	 * See also getScriptURLsForDebug().
 	 *
 	 * @stable to override
 	 * @param Context $context
@@ -546,7 +502,7 @@ abstract class Module implements LoggerAwareInterface {
 	 * @see Module::setFileDependencies()
 	 * @see Module::saveFileDependencies()
 	 * @param Context $context
-	 * @return string[] List of absolute file paths
+	 * @return string[] List of relative file paths
 	 */
 	protected function getFileDependencies( Context $context ) {
 		$variant = self::getVary( $context );
@@ -555,7 +511,7 @@ abstract class Module implements LoggerAwareInterface {
 			$depStore = $context->getResourceLoader()->getDependencyStore();
 			$moduleName = $this->getName();
 			$styleDependencies = $depStore->retrieve( "$moduleName|$variant" );
-			$this->fileDeps[$variant] = self::expandRelativePaths( $styleDependencies['paths'] );
+			$this->fileDeps[$variant] = $styleDependencies['paths'];
 		}
 
 		return $this->fileDeps[$variant];
@@ -569,7 +525,7 @@ abstract class Module implements LoggerAwareInterface {
 	 * @see Module::getFileDependencies()
 	 * @see Module::saveFileDependencies()
 	 * @param Context $context
-	 * @param string[] $paths List of absolute file paths
+	 * @param string[] $paths List of relative file paths
 	 */
 	public function setFileDependencies( Context $context, array $paths ) {
 		$variant = self::getVary( $context );
@@ -596,7 +552,7 @@ abstract class Module implements LoggerAwareInterface {
 		//    been normalized yet.
 
 		$paths = self::getRelativePaths( $curFileRefs );
-		$priorPaths = self::getRelativePaths( $this->getFileDependencies( $context ) );
+		$priorPaths = $this->getFileDependencies( $context );
 
 		if ( array_diff( $paths, $priorPaths ) || array_diff( $priorPaths, $paths ) ) {
 			$depStore = $context->getResourceLoader()->getDependencyStore();
@@ -789,7 +745,7 @@ abstract class Module implements LoggerAwareInterface {
 	 */
 	final protected function buildContent( Context $context ) {
 		$statsFactory = MediaWikiServices::getInstance()->getStatsFactory();
-		$statStart = microtime( true );
+		$statStart = hrtime( true );
 
 		// This MUST build both scripts and styles, regardless of whether $context->getOnly()
 		// is 'scripts' or 'styles' because the result is used by getVersionHash which
@@ -800,16 +756,9 @@ abstract class Module implements LoggerAwareInterface {
 		$content = [];
 
 		// Scripts
-		if ( $context->getDebug() === $context::DEBUG_LEGACY && !$context->getOnly() && $this->supportsURLLoading() ) {
-			// In legacy debug mode, let supporting modules like FileModule replace the bundled
-			// script closure with an array of alternative script URLs to consecutively load instead.
-			// See self::getScriptURLsForDebug() more details.
-			$scripts = $this->getScriptURLsForDebug( $context );
-		} else {
-			$scripts = $this->getScript( $context );
-			if ( is_string( $scripts ) ) {
-				$scripts = [ 'plainScripts' => [ [ 'content' => $scripts ] ] ];
-			}
+		$scripts = $this->getScript( $context );
+		if ( is_string( $scripts ) ) {
+			$scripts = [ 'plainScripts' => [ [ 'content' => $scripts ] ] ];
 		}
 		$content['scripts'] = $scripts;
 
@@ -872,16 +821,14 @@ abstract class Module implements LoggerAwareInterface {
 			$content['deprecationWarning'] = $deprecationWarning;
 		}
 
-		$statTiming = microtime( true ) - $statStart;
 		$statName = strtr( $this->getName(), '.', '_' );
-
 		$statsFactory->getTiming( 'resourceloader_build_seconds' )
 			->setLabel( 'name', $statName )
 			->copyToStatsdAt( [
 				'resourceloader_build.all',
 				"resourceloader_build.$statName",
 			] )
-			->observe( 1000 * $statTiming );
+			->observeNanoseconds( hrtime( true ) - $statStart );
 
 		return $content;
 	}
@@ -1044,7 +991,7 @@ abstract class Module implements LoggerAwareInterface {
 	/**
 	 * Validate a user-provided JavaScript blob.
 	 *
-	 * @param string $fileName
+	 * @param string $fileName Page title
 	 * @param string $contents JavaScript code
 	 * @return string JavaScript code, either the original content or a replacement
 	 *  that uses `mw.log.error()` to communicate a syntax error.
@@ -1054,10 +1001,14 @@ abstract class Module implements LoggerAwareInterface {
 			return $contents;
 		}
 		$cache = MediaWikiServices::getInstance()->getMainWANObjectCache();
-		// Cache potentially slow parsing of JavaScript code during the
-		// critical path. This happens lazily when responding to requests
-		// for modules=site, modules=user, and Gadgets.
+		// Cache potentially slow parsing of JavaScript code during the critical path.
+		// This happens during load.php requests for modules=site, modules=user, and Gadgets.
 		$error = $cache->getWithSetCallback(
+			// A content hash is included in the cache key so that this is immediately
+			// correct and re-computed after edits without relying on TTL or purges.
+			//
+			// We avoid accidental or abusive conflicts with other pages by including the
+			// wiki (makeKey vs makeGlobalKey) and page, because hashes are not unique.
 			$cache->makeKey(
 				'resourceloader-userjsparse',
 				self::USERJSPARSE_CACHE_VERSION,
@@ -1065,7 +1016,7 @@ abstract class Module implements LoggerAwareInterface {
 				$fileName
 			),
 			$cache::TTL_WEEK,
-			static function () use ( $contents, $fileName ) {
+			static function () use ( $contents ) {
 				try {
 					Peast::ES2016( $contents )->parse();
 				} catch ( PeastSyntaxException $e ) {
@@ -1079,12 +1030,11 @@ abstract class Module implements LoggerAwareInterface {
 		if ( $error ) {
 			// Send the error to the browser console client-side.
 			// By returning this as replacement for the actual script,
-			// we ensure user-provided scripts are safe to include in a batch
-			// request, without risk of a syntax error in this blob breaking
-			// the response itself.
+			// we ensure user-provided scripts are safe to serve to a browser,
+			// without breaking unrelated modules in the same response.
 			return 'mw.log.error(' .
 				json_encode(
-					'Parse error: ' . $error
+					"Parse error: $error in $fileName"
 				) .
 				');';
 		}

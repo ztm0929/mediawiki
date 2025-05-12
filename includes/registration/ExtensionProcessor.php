@@ -91,6 +91,8 @@ class ExtensionProcessor implements Processor {
 		'TempUserSerialMappings',
 		'DatabaseVirtualDomains',
 		'UserOptionsStoreProviders',
+		'NotificationHandlers',
+		'NotificationMiddleware',
 	];
 
 	/**
@@ -100,6 +102,7 @@ class ExtensionProcessor implements Processor {
 	 * @see getExtractedInfo
 	 */
 	protected const MERGE_STRATEGIES = [
+		'wgAddGroups' => 'array_merge_recursive',
 		'wgAuthManagerAutoConfig' => 'array_plus_2d',
 		'wgCapitalLinkOverrides' => 'array_plus',
 		'wgExtraGenderNamespaces' => 'array_plus',
@@ -111,6 +114,7 @@ class ExtensionProcessor implements Processor {
 		'wgNamespacesWithSubpages' => 'array_plus',
 		'wgPasswordPolicy' => 'array_merge_recursive',
 		'wgRateLimits' => 'array_plus_2d',
+		'wgRemoveGroups' => 'array_merge_recursive',
 		'wgRevokePermissions' => 'array_plus_2d',
 	];
 
@@ -147,7 +151,7 @@ class ExtensionProcessor implements Processor {
 		'TranslationAliasesDirs',
 		'ForeignResourcesDir',
 		'Hooks',
-		'Listeners',
+		'DomainEventIngresses',
 		'MessagePosterModule',
 		'MessagesDirs',
 		'OOUIThemePaths',
@@ -260,7 +264,7 @@ class ExtensionProcessor implements Processor {
 	public function extractInfo( $path, array $info, $version ) {
 		$dir = dirname( $path );
 		$this->extractHooks( $info, $path );
-		$this->extractListeners( $info, $path );
+		$this->extractDomainEventIngresses( $info, $path );
 		$this->extractExtensionMessagesFiles( $dir, $info );
 		$this->extractRestModuleFiles( $dir, $info );
 		$this->extractMessagesDirs( $dir, $info );
@@ -303,7 +307,7 @@ class ExtensionProcessor implements Processor {
 						'class' => $className,
 					];
 				}
-				$module['name'] = $name;
+				$module['name'] ??= $name;
 			}
 		}
 
@@ -472,18 +476,14 @@ class ExtensionProcessor implements Processor {
 	 * @param array $hookHandlersAttr handler definitions from 'HookHandler' attribute
 	 * @param string $name
 	 * @param string $path extension.json file path
-	 * @param array &$modernTarget reference to an array that will receive
-	 *              handlers using object references.
-	 * @param array &$legacyTarget reference to an array that will receive
-	 *              handlers using object specs.
+	 *
+	 * @throws UnexpectedValueException
 	 */
-	private function setArrayCallback(
+	private function setArrayHookHandler(
 		array $callback,
 		array $hookHandlersAttr,
 		string $name,
-		string $path,
-		array &$modernTarget,
-		array &$legacyTarget
+		string $path
 	) {
 		if ( isset( $callback['handler'] ) ) {
 			$handlerName = $callback['handler'];
@@ -495,31 +495,17 @@ class ExtensionProcessor implements Processor {
 			}
 			$callback['handler'] = $handlerDefinition;
 			$callback['extensionPath'] = $path;
-			$modernTarget[$name][] = $callback;
+			$this->attributes['Hooks'][$name][] = $callback;
 		} else {
 			foreach ( $callback as $callable ) {
 				if ( is_array( $callable ) ) {
 					if ( isset( $callable['handler'] ) ) { // Non-legacy style handler
-						$this->setArrayCallback(
-							$callable,
-							$hookHandlersAttr,
-							$name,
-							$path,
-							$modernTarget,
-							$legacyTarget
-						);
+						$this->setArrayHookHandler( $callable, $hookHandlersAttr, $name, $path );
 					} else { // Legacy style handler array
-						$legacyTarget[$name][] = $callable;
+						$this->globals['wgHooks'][$name][] = $callable;
 					}
 				} elseif ( is_string( $callable ) ) {
-					$this->setStringCallback(
-						$callable,
-						$hookHandlersAttr,
-						$name,
-						$path,
-						$modernTarget,
-						$legacyTarget
-					);
+					$this->setStringHookHandler( $callable, $hookHandlersAttr, $name, $path );
 				}
 			}
 		}
@@ -534,27 +520,21 @@ class ExtensionProcessor implements Processor {
 	 * @param array $hookHandlersAttr handler definitions from 'HookHandler' attribute
 	 * @param string $name
 	 * @param string $path
-	 * @param array &$modernTarget reference to an array that will receive
-	 *              handlers using object references.
-	 * @param array &$legacyTarget reference to an array that will receive
-	 *              handlers using object specs.
 	 */
-	private function setStringCallback(
+	private function setStringHookHandler(
 		string $callback,
 		array $hookHandlersAttr,
 		string $name,
-		string $path,
-		array &$modernTarget,
-		array &$legacyTarget
+		string $path
 	) {
 		if ( isset( $hookHandlersAttr[$callback] ) ) {
 			$handler = [
 				'handler' => $hookHandlersAttr[$callback],
 				'extensionPath' => $path
 			];
-			$modernTarget[$name][] = $handler;
+			$this->attributes['Hooks'][$name][] = $handler;
 		} else { // legacy style handler
-			$legacyTarget[$name][] = $callback;
+			$this->globals['wgHooks'][$name][] = $callback;
 		}
 	}
 
@@ -573,28 +553,11 @@ class ExtensionProcessor implements Processor {
 			foreach ( $info['HookHandlers'] ?? [] as $name => $def ) {
 				$hookHandlersAttr[$name] = [ 'name' => "$extName-$name" ] + $def;
 			}
-
-			$this->attributes['Hooks'] ??= [];
-			$this->globals['wgHooks'] ??= [];
 			foreach ( $info['Hooks'] as $name => $callback ) {
 				if ( is_string( $callback ) ) {
-					$this->setStringCallback(
-						$callback,
-						$hookHandlersAttr,
-						$name,
-						$path,
-						$this->attributes['Hooks'],
-						$this->globals['wgHooks']
-					);
+					$this->setStringHookHandler( $callback, $hookHandlersAttr, $name, $path );
 				} elseif ( is_array( $callback ) ) {
-					$this->setArrayCallback(
-						$callback,
-						$hookHandlersAttr,
-						$name,
-						$path,
-						$this->attributes['Hooks'],
-						$this->globals['wgHooks']
-					);
+					$this->setArrayHookHandler( $callback, $hookHandlersAttr, $name, $path );
 				}
 			}
 		}
@@ -613,52 +576,21 @@ class ExtensionProcessor implements Processor {
 	}
 
 	/**
-	 * Extract listeners.
+	 * Extract domain event subscribers.
 	 *
 	 * @param array $info attributes and associated values from extension.json
 	 * @param string $path path to extension.json
 	 */
-	protected function extractListeners( array $info, string $path ) {
-		$extName = $info['name'];
-		if ( isset( $info['Listeners'] ) ) {
-			$hookHandlersAttr = [];
-
-			// The term "HookHandlers" is kind of confusing here, but
-			// renaming it would be hard, and it's not clear what we'd
-			// want to rename it to...
-			foreach ( $info['HookHandlers'] ?? [] as $name => $def ) {
-				$hookHandlersAttr[$name] = [ 'name' => "$extName-$name" ] + $def;
-			}
-
-			$this->attributes['Listeners'] ??= [];
-			foreach ( $info['Listeners'] as $name => $callback ) {
-				if ( is_string( $callback ) ) {
-					$this->setStringCallback(
-						$callback,
-						$hookHandlersAttr,
-						$name,
-						$path,
-						$this->attributes['Listeners'],
-						$this->attributes['Listeners']
-					);
-				} elseif ( is_array( $callback ) ) {
-					$this->setArrayCallback(
-						$callback,
-						$hookHandlersAttr,
-						$name,
-						$path,
-						$this->attributes['Listeners'],
-						$this->attributes['Listeners']
-					);
-				}
-			}
+	protected function extractDomainEventIngresses( array $info, string $path ) {
+		$this->attributes['DomainEventIngresses'] ??= [];
+		foreach ( $info['DomainEventIngresses'] ?? [] as $subscriber ) {
+			$subscriber['extensionPath'] = $path;
+			$this->attributes['DomainEventIngresses'][] = $subscriber;
 		}
 	}
 
 	/**
 	 * Register namespaces with the appropriate global settings
-	 *
-	 * @param array $info
 	 */
 	protected function extractNamespaces( array $info ) {
 		if ( isset( $info['namespaces'] ) ) {
@@ -831,8 +763,6 @@ class ExtensionProcessor implements Processor {
 
 	/**
 	 * Extract any user rights that should be granted implicitly.
-	 *
-	 * @param array $info
 	 */
 	protected function extractImplicitRights( array $info ) {
 		// Rate limits are only configurable for rights that are either in wgImplicitRights
@@ -1106,10 +1036,6 @@ class ExtensionProcessor implements Processor {
 		return $autoload;
 	}
 
-	/**
-	 * @param array $info
-	 * @param string $dir
-	 */
 	private function extractAutoload( array $info, string $dir ) {
 		if ( isset( $info['load_composer_autoloader'] ) && $info['load_composer_autoloader'] === true ) {
 			$file = "$dir/vendor/autoload.php";

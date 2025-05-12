@@ -427,9 +427,9 @@ FiltersViewModel.prototype.updateStateFromParams = function ( params ) {
 
 	// Update filter values
 	const filtersValue = this.getFiltersFromParameters( params );
-	Object.keys( filtersValue ).forEach( ( filterName ) => {
+	for ( const filterName in filtersValue ) {
 		this.getItemByName( filterName ).setValue( filtersValue[ filterName ] );
-	} );
+	}
 
 	// Update highlight state
 	this.getItemsSupportingHighlights().forEach( ( filterItem ) => {
@@ -484,13 +484,13 @@ FiltersViewModel.prototype.getMinimizedParamRepresentation = function ( paramete
 	} );
 
 	// Highlights
-	Object.keys( this.getEmptyHighlightParameters() ).forEach( ( param ) => {
+	for ( const param in this.getEmptyHighlightParameters() ) {
 		if ( parameters[ param ] ) {
 			// If a highlight parameter is not undefined and not null
 			// add it to the result
 			result[ param ] = parameters[ param ];
 		}
-	} );
+	}
 
 	return result;
 };
@@ -858,7 +858,7 @@ FiltersViewModel.prototype.getCurrentlyUsedHighlightColors = function () {
 		this.getHighlightedItems().forEach( ( filterItem ) => {
 			const color = filterItem.getHighlightColor();
 
-			if ( result.indexOf( color ) === -1 ) {
+			if ( !result.includes( color ) ) {
 				result.push( color );
 			}
 		} );
@@ -974,9 +974,9 @@ FiltersViewModel.prototype.toggleFilterSelected = function ( name, isSelected ) 
  * @param {Object} filterDef Filter definitions
  */
 FiltersViewModel.prototype.toggleFiltersSelected = function ( filterDef ) {
-	Object.keys( filterDef ).forEach( ( name ) => {
+	for ( const name in filterDef ) {
 		this.toggleFilterSelected( name, filterDef[ name ] );
-	} );
+	}
 };
 
 /**
@@ -1039,7 +1039,7 @@ FiltersViewModel.prototype.findMatches = function ( query, returnFlat ) {
 			(
 				// For tags, we want the parameter name to be included in the search
 				view === 'tags' &&
-				items[ i ].getParamName().toLowerCase().indexOf( query ) > -1
+				items[ i ].getParamName().toLowerCase().includes( query )
 			)
 		) {
 			result[ items[ i ].getGroupName() ] = result[ items[ i ].getGroupName() ] || [];
@@ -1054,13 +1054,13 @@ FiltersViewModel.prototype.findMatches = function ( query, returnFlat ) {
 			const groupTitle = items[ i ].getGroupModel().getTitle();
 			if (
 				searchIsEmpty ||
-				items[ i ].getLabel().toLowerCase().indexOf( query ) > -1 ||
-				items[ i ].getDescription().toLowerCase().indexOf( query ) > -1 ||
-				groupTitle.toLowerCase().indexOf( query ) > -1 ||
+				items[ i ].getLabel().toLowerCase().includes( query ) ||
+				items[ i ].getDescription().toLowerCase().includes( query ) ||
+				groupTitle.toLowerCase().includes( query ) ||
 				(
 					// For tags, we want the parameter name to be included in the search
 					view === 'tags' &&
-					items[ i ].getParamName().toLowerCase().indexOf( query ) > -1
+					items[ i ].getParamName().toLowerCase().includes( query )
 				)
 			) {
 				result[ items[ i ].getGroupName() ] = result[ items[ i ].getGroupName() ] || [];
@@ -1198,7 +1198,7 @@ FiltersViewModel.prototype.setSearch = function ( searchQuery ) {
 		// eslint-disable-next-line no-jquery/no-each-util
 		$.each( this.getFilterGroups(), ( groupName, groupModel ) => {
 			// Check if the group is visible at all
-			groupModel.toggleVisible( visibleGroupNames.indexOf( groupName ) !== -1 );
+			groupModel.toggleVisible( visibleGroupNames.includes( groupName ) );
 			groupModel.setVisibleItems( visibleGroups[ groupName ] || [] );
 		} );
 

@@ -28,7 +28,6 @@ use Wikimedia\Rdbms\IConnectionProvider;
  */
 class RevDelArchivedRevisionItem extends RevDelArchiveItem {
 
-	/** @var IConnectionProvider */
 	protected IConnectionProvider $dbProvider;
 
 	/**
@@ -41,16 +40,10 @@ class RevDelArchivedRevisionItem extends RevDelArchiveItem {
 		parent::__construct( $list, $row );
 	}
 
-	/**
-	 * @return string
-	 */
 	public function getIdField(): string {
 		return 'ar_rev_id';
 	}
 
-	/**
-	 * @return int
-	 */
 	public function getId(): int {
 		return $this->getRevisionRecord()->getId();
 	}

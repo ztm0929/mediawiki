@@ -22,11 +22,11 @@ namespace MediaWiki\Status;
 
 use MediaWiki\Api\ApiMessage;
 use MediaWiki\Language\Language;
+use MediaWiki\Language\MessageParser;
 use MediaWiki\Language\RawMessage;
 use MediaWiki\Message\Message;
 use MediaWiki\Page\PageReferenceValue;
 use MediaWiki\StubObject\StubUserLang;
-use MessageCache;
 use MessageLocalizer;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
@@ -45,16 +45,16 @@ use Wikimedia\Message\MessageSpecifier;
 class StatusFormatter {
 
 	private MessageLocalizer $messageLocalizer;
-	private MessageCache $messageCache;
+	private MessageParser $messageParser;
 	private LoggerInterface $logger;
 
 	public function __construct(
 		MessageLocalizer $messageLocalizer,
-		MessageCache $messageCache,
+		MessageParser $messageParser,
 		LoggerInterface $logger
 	) {
 		$this->messageLocalizer = $messageLocalizer;
-		$this->messageCache = $messageCache;
+		$this->messageParser = $messageParser;
 		$this->logger = $logger;
 	}
 
@@ -72,7 +72,7 @@ class StatusFormatter {
 		}
 		$cleanParams = [];
 		foreach ( $params as $i => $param ) {
-			$cleanParams[$i] = call_user_func( $cleanCallback, $param );
+			$cleanParams[$i] = $cleanCallback( $param );
 		}
 		return $cleanParams;
 	}
@@ -241,18 +241,17 @@ class StatusFormatter {
 			// identical to getMessage( false, false, 'en' ) when there's just one error
 			$message = $this->getErrorMessage( $errors[0], [ 'lang' => 'en' ] );
 
-			if ( in_array( get_class( $message ), [ Message::class, ApiMessage::class ], true ) ) {
-				// Fall back to getWikiText for rawmessage, which is just a placeholder for non-translated text.
-				// Turning the entire message into a context parameter wouldn't be useful.
-				if ( $message->getKey() === 'rawmessage' ) {
-					return [ $this->getWikiText( $status, $options ), $context ];
-				}
+			if ( $message instanceof RawMessage ) {
+				$text = $message->getTextOfRawMessage();
+				$params = $message->getParamsOfRawMessage();
+			} elseif ( $message instanceof ApiMessage ||
+				// rawmessage is just a placeholder for non-translated text. Turning the entire
+				// message into a context parameter wouldn't be useful.
+				( get_class( $message ) === Message::class && $message->getKey() !== 'rawmessage' )
+			) {
 				// $1,$2... will be left as-is when no parameters are provided.
 				$text = $this->msgInLang( $message->getKey(), 'en' )->plain();
 				$params = $message->getParams();
-			} elseif ( $message instanceof RawMessage ) {
-				$text = $message->getTextOfRawMessage();
-				$params = $message->getParamsOfRawMessage();
 			} else {
 				// Unknown Message subclass, we can't be sure how it marks parameters. Fall back to getWikiText.
 				return [ $this->getWikiText( $status, $options ), $context ];
@@ -351,8 +350,12 @@ class StatusFormatter {
 		$lang = $options['lang'] ?? null;
 
 		$text = $this->getWikiText( $status, $options );
-		$out = $this->messageCache->parseWithPostprocessing(
-			$text, PageReferenceValue::localReference( NS_SPECIAL, 'Badtitle/StatusFormatter' ), true, $lang
+		$out = $this->messageParser->parse(
+			$text,
+			PageReferenceValue::localReference( NS_SPECIAL, 'Badtitle/StatusFormatter' ),
+			/*linestart*/ true,
+			/*interface*/ true,
+			$lang
 		);
 
 		return $out->getContentHolderText();

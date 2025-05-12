@@ -2,20 +2,22 @@
 
 namespace MediaWiki\EditPage;
 
-use LogEventsList;
 use LogicException;
-use MediaWiki\Block\Block;
 use MediaWiki\Block\DatabaseBlockStore;
 use MediaWiki\Config\Config;
+use MediaWiki\FileRepo\RepoGroup;
 use MediaWiki\Html\Html;
 use MediaWiki\Language\RawMessage;
 use MediaWiki\Linker\LinkRenderer;
+use MediaWiki\Logging\LogEventsList;
 use MediaWiki\MainConfigNames;
 use MediaWiki\Page\ProperPageIdentity;
 use MediaWiki\Permissions\Authority;
 use MediaWiki\Permissions\PermissionManager;
 use MediaWiki\Permissions\RestrictionStore;
 use MediaWiki\Revision\RevisionRecord;
+use MediaWiki\Skin\Skin;
+use MediaWiki\Skin\SkinFactory;
 use MediaWiki\SpecialPage\SpecialPage;
 use MediaWiki\SpecialPage\SpecialPageFactory;
 use MediaWiki\Title\NamespaceInfo;
@@ -26,9 +28,6 @@ use MediaWiki\User\UserNameUtils;
 use MediaWiki\User\UserRigorOptions;
 use MediaWiki\Utils\UrlUtils;
 use MessageLocalizer;
-use RepoGroup;
-use Skin;
-use SkinFactory;
 use Wikimedia\Rdbms\IConnectionProvider;
 use Wikimedia\Rdbms\ReadOnlyMode;
 
@@ -323,7 +322,6 @@ class IntroMessageBuilder {
 			$validation = UserRigorOptions::RIGOR_NONE;
 			$user = $this->userFactory->newFromName( $username, $validation );
 			$ip = $this->userNameUtils->isIP( $username );
-			$block = $this->blockStore->newFromTarget( $user, $user );
 
 			$userExists = ( $user && $user->isRegistered() );
 			if ( $userExists && $user->isHidden() && !$performer->isAllowed( 'hideuser' ) ) {
@@ -341,37 +339,19 @@ class IntroMessageBuilder {
 						'mw-userpage-userdoesnotexist'
 					)
 				);
-			} elseif (
-				$block !== null &&
-				$block->getType() !== Block::TYPE_AUTO &&
-				(
-					$block->isSitewide() ||
-					$this->permManager->isBlockedFrom(
-						// @phan-suppress-next-line PhanTypeMismatchArgumentNullable False positive
-						$user,
-						$title,
-						true
-					)
-				)
-			) {
-				// Show log extract if the user is sitewide blocked or is partially
-				// blocked and not allowed to edit their user page or user talk page
-				$messages->addWithKey(
-					'blocked-notice-logextract',
-					$this->getLogExtract(
-						'block',
-						$this->namespaceInfo->getCanonicalName( NS_USER ) . ':' . $block->getTargetName(),
-						'',
-						[
-							'lim' => 1,
-							'showIfEmpty' => false,
-							'msgKey' => [
-								'blocked-notice-logextract',
-								$user->getName() # Support GENDER in notice
-							],
-						]
-					)
-				);
+				return;
+			}
+
+			$blockLogBox = LogEventsList::getBlockLogWarningBox(
+				$this->blockStore,
+				$this->namespaceInfo,
+				$localizer,
+				$this->linkRenderer,
+				$user,
+				$title
+			);
+			if ( $blockLogBox !== null ) {
+				$messages->addWithKey( 'blocked-notice-logextract', $blockLogBox );
 			}
 		}
 	}
@@ -641,18 +621,20 @@ class IntroMessageBuilder {
 		}
 		if ( $this->restrictionStore->isCascadeProtected( $page ) ) {
 			# Is this page under cascading protection from some source pages?
-			$cascadeSources = $this->restrictionStore->getCascadeProtectionSources( $page )[0];
-			$htmlList = '';
-			# Explain, and list the titles responsible
-			foreach ( $cascadeSources as $source ) {
-				$htmlList .= Html::rawElement( 'li', [], $this->linkRenderer->makeLink( $source ) );
+			$tlCascadeSources = $this->restrictionStore->getCascadeProtectionSources( $page )[2];
+			if ( $tlCascadeSources ) {
+				$htmlList = '';
+				# Explain, and list the titles responsible
+				foreach ( $tlCascadeSources as $source ) {
+					$htmlList .= Html::rawElement( 'li', [], $this->linkRenderer->makeLink( $source ) );
+				}
+				$messages->addWithKey(
+					'cascadeprotectedwarning',
+					$localizer->msg( 'cascadeprotectedwarning', count( $tlCascadeSources ) )->parse() .
+						( $htmlList ? Html::rawElement( 'ul', [], $htmlList ) : '' ),
+					Html::warningBox( '$1', 'mw-cascadeprotectedwarning' )
+				);
 			}
-			$messages->addWithKey(
-				'cascadeprotectedwarning',
-				$localizer->msg( 'cascadeprotectedwarning', count( $cascadeSources ) )->parse() .
-					( $htmlList ? Html::rawElement( 'ul', [], $htmlList ) : '' ),
-				Html::warningBox( '$1', 'mw-cascadeprotectedwarning' )
-			);
 		}
 		if ( !$page->exists() && $this->restrictionStore->getRestrictions( $page, 'create' ) ) {
 			$messages->addWithKey(

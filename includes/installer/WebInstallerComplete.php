@@ -21,34 +21,27 @@
 
 namespace MediaWiki\Installer;
 
-use HtmlArmor;
-use MediaWiki\Message\Message;
-
 class WebInstallerComplete extends WebInstallerPage {
 
 	public function execute() {
 		// Pop up a dialog box, to make it difficult for the user to forget
 		// to download the file
-		$lsUrl = $this->getVar( 'wgServer' ) . $this->parent->getUrl( [ 'localsettings' => 1 ] );
-		$this->parent->request->response()->header( "Refresh: 0;url=$lsUrl" );
+		$lsPath = $this->parent->getUrl( [ 'localsettings' => 1 ] );
+		$lsUrl = $this->parent->getDefaultServer() . $lsPath;
+		$this->parent->request->response()->header( "Refresh: 0;url=$lsPath" );
 		$this->startForm();
 		$this->parent->disableLinkPopups();
 		$location = $this->parent->getLocalSettingsLocation();
 		$msg = 'config-install-done';
 		if ( $location !== false ) {
-			// config-install-done-path
-			$msg .= '-path';
+			$msg = 'config-install-done-path';
 		}
-		$this->addHTML(
-			$this->parent->getInfoBox(
-				new HtmlArmor( wfMessage( $msg,
-					$lsUrl,
-					$this->getVar( 'wgServer' ) .
-						$this->getVar( 'wgScriptPath' ) . '/index.php',
-					Message::rawParam( $this->parent->makeDownloadLinkHtml() ),
-					$location ?: ''
-				)->parse() ), 'tick-32.png'
-			)
+		$this->parent->showSuccess( $msg,
+			$lsUrl,
+			$this->getVar( 'wgServer' ) .
+				$this->getVar( 'wgScriptPath' ) . '/index.php',
+			"[$lsUrl " . wfMessage( 'config-download-localsettings' )->plain() . ']',
+			$location ?: ''
 		);
 		$this->addHTML( $this->parent->getInfoBox(
 			wfMessage( 'config-extension-link' )->plain() ) );

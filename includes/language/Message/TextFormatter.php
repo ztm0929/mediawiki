@@ -14,11 +14,8 @@ use Wikimedia\Message\MessageSpecifier;
  * @ingroup Language
  */
 class TextFormatter implements ITextFormatter {
-	/** @var string */
-	private $langCode;
-
-	/** @var string */
-	private $format;
+	private string $langCode;
+	private string $format;
 
 	/**
 	 * @internal For use by ServiceWiring only
@@ -33,7 +30,7 @@ class TextFormatter implements ITextFormatter {
 		$this->format = $format;
 	}
 
-	public function getLangCode() {
+	public function getLangCode(): string {
 		return $this->langCode;
 	}
 
@@ -45,7 +42,7 @@ class TextFormatter implements ITextFormatter {
 	 * @param MessageSpecifier $spec
 	 * @return Message
 	 */
-	protected function createMessage( MessageSpecifier $spec ) {
+	protected function createMessage( MessageSpecifier $spec ): Message {
 		return Message::newFromSpecifier( $spec );
 	}
 

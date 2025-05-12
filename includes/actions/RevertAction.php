@@ -23,11 +23,21 @@
  * @author Rob Church <robchur@gmail.com>
  */
 
+namespace MediaWiki\Actions;
+
 use MediaWiki\Context\IContextSource;
+use MediaWiki\Exception\ErrorPageError;
+use MediaWiki\Exception\PermissionsError;
+use MediaWiki\FileRepo\File\File;
+use MediaWiki\FileRepo\File\LocalFile;
+use MediaWiki\FileRepo\File\OldLocalFile;
+use MediaWiki\FileRepo\RepoGroup;
 use MediaWiki\HTMLForm\HTMLForm;
 use MediaWiki\Language\Language;
 use MediaWiki\MediaWikiServices;
 use MediaWiki\Output\OutputPage;
+use MediaWiki\Page\Article;
+use MediaWiki\Page\WikiFilePage;
 use MediaWiki\Status\Status;
 use MediaWiki\User\User;
 use MediaWiki\Utils\MWTimestamp;
@@ -71,6 +81,7 @@ class RevertAction extends FormAction {
 	}
 
 	public function getRestriction() {
+		// Required permissions of revert are complicated, will be checked below.
 		return 'upload';
 	}
 
@@ -78,6 +89,16 @@ class RevertAction extends FormAction {
 		if ( $this->getTitle()->getNamespace() !== NS_FILE ) {
 			throw new ErrorPageError( $this->msg( 'nosuchaction' ), $this->msg( 'nosuchactiontext' ) );
 		}
+
+		$rights = [ 'reupload' ];
+		if ( $user->equals( $this->getFile()->getUploader() ) ) {
+			// reupload-own is more basic, put it in the front for error messages.
+			array_unshift( $rights, 'reupload-own' );
+		}
+		if ( !$user->isAllowedAny( ...$rights ) ) {
+			throw new PermissionsError( $rights[0] );
+		}
+
 		parent::checkCanExecute( $user );
 
 		$oldimage = $this->getRequest()->getText( 'oldimage' );
@@ -211,9 +232,12 @@ class RevertAction extends FormAction {
 	 * @return File
 	 */
 	private function getFile(): File {
-		/** @var \WikiFilePage $wikiPage */
+		/** @var WikiFilePage $wikiPage */
 		$wikiPage = $this->getWikiPage();
 		// @phan-suppress-next-line PhanUndeclaredMethod
 		return $wikiPage->getFile();
 	}
 }
+
+/** @deprecated class alias since 1.44 */
+class_alias( RevertAction::class, 'RevertAction' );

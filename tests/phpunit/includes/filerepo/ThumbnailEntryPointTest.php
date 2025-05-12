@@ -1,6 +1,7 @@
 <?php
 
 use MediaWiki\Context\RequestContext;
+use MediaWiki\FileRepo\File\UnregisteredLocalFile;
 use MediaWiki\FileRepo\ThumbnailEntryPoint;
 use MediaWiki\MainConfigNames;
 use MediaWiki\Permissions\SimpleAuthority;
@@ -43,7 +44,7 @@ class ThumbnailEntryPointTest extends MediaWikiIntegrationTestCase {
 		$this->importFileToTestRepo( self::IMAGES_DIR . '/test.jpg', 'Icon.jpg' );
 
 		// Create a second version of Test.png and Icon.jpg
-		$this->importFileToTestRepo( self::IMAGES_DIR . '/greyscale-na-png.png', 'Test.png' );
+		$this->importFileToTestRepo( self::IMAGES_DIR . '/greyscale-dot-na-png.png', 'Test.png' );
 		$this->importFileToTestRepo( self::IMAGES_DIR . '/portrait-rotated.jpg', 'Icon.jpg' );
 
 		// Create a redirect
@@ -175,7 +176,7 @@ class ThumbnailEntryPointTest extends MediaWikiIntegrationTestCase {
 
 		$response = $env->getFauxResponse();
 		$this->assertSame( 'image/png', $response->getHeader( 'Content-Type' ) );
-		$this->assertGreaterThan( 500, (int)$response->getHeader( 'Content-Length' ) );
+		$this->assertGreaterThan( 400, (int)$response->getHeader( 'Content-Length' ) );
 
 		$env->assertStatusCode( 200, $output );
 
@@ -232,6 +233,38 @@ class ThumbnailEntryPointTest extends MediaWikiIntegrationTestCase {
 			[
 				'f' => 'Test.png',
 				'width' => self::$uniqueWidth++
+			]
+		);
+		$entryPoint = $this->getEntryPoint( $env );
+
+		$entryPoint->run();
+		$output = $entryPoint->getCapturedOutput();
+
+		$env->assertStatusCode( 400, $output );
+	}
+
+	/** Verify that the exception from ImageHandler:makeParamString is handled */
+	public function testNoWidth() {
+		$env = $this->makeEnvironment(
+			[
+				'f' => 'Test.png',
+				// no width
+			]
+		);
+		$entryPoint = $this->getEntryPoint( $env );
+
+		$entryPoint->run();
+		$output = $entryPoint->getCapturedOutput();
+
+		$env->assertStatusCode( 400, $output );
+	}
+
+	/** Verify that the exception from ImageHandler:makeParamString is handled in redirect case - T387684 */
+	public function testNoWidthRedirect() {
+		$env = $this->makeEnvironment(
+			[
+				'f' => 'Redirect_to_Test.png',
+				// no width
 			]
 		);
 		$entryPoint = $this->getEntryPoint( $env );

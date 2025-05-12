@@ -284,7 +284,7 @@ class LinkFilterTest extends MediaWikiLangTestCase {
 	}
 
 	/**
-	 * @dataProvider provideMakeIndexes()
+	 * @dataProvider provideMakeIndexes
 	 */
 	public function testMakeIndexes( $url, $expected ) {
 		// Set global so file:// tests can work
@@ -381,7 +381,7 @@ class LinkFilterTest extends MediaWikiLangTestCase {
 	}
 
 	/**
-	 * @dataProvider provideReverseIndexes()
+	 * @dataProvider provideReverseIndexes
 	 */
 	public function testReverseIndex( $url, $expected ) {
 		// Set global so file:// tests can work
@@ -414,6 +414,11 @@ class LinkFilterTest extends MediaWikiLangTestCase {
 				// mailtos are handled special
 				'mailto:@wiki',
 				'mailto:wiki@'
+			],
+			[
+				// mailtos are handled special
+				'mailto:wiki',
+				'mailto:wiki'
 			],
 
 			// file URL cases per T30627...

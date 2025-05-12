@@ -22,6 +22,7 @@
 use MediaWiki\Config\ServiceOptions;
 use MediaWiki\Content\TextContent;
 use MediaWiki\Language\Language;
+use MediaWiki\Maintenance\Maintenance;
 use MediaWiki\Parser\ParserOptions;
 use MediaWiki\Parser\ParserOutput;
 use MediaWiki\Rest\Handler\Helper\PageRestHelperFactory;
@@ -61,6 +62,7 @@ class CompareLanguageConverterOutput extends Maintenance {
 		);
 	}
 
+	/** @inheritDoc */
 	public function execute() {
 		$mwInstance = $this->getServiceContainer();
 

@@ -49,6 +49,23 @@ class SpecialUserRightsTest extends SpecialPageTestBase {
 		$this->testUserCanChangeRights( $temporaryAccount, false, false );
 	}
 
+	public function testShowForm() {
+		$target = $this->getTestUser()->getUser();
+		$performer = $this->getTestSysop()->getUser();
+
+		[ $html ] = $this->executeSpecialPage(
+			$target->getName(),
+			null,
+			'qqx',
+			$performer
+		);
+
+		$targetName = $target->getName();
+		$this->assertStringContainsString( "(userrights-editusergroup: $targetName)", $html );
+		$this->assertStringContainsString( 'wpGroup-sysop', $html );
+		$this->assertStringContainsString( '(logempty)', $html );
+	}
+
 	public function testSaveUserGroups() {
 		$target = $this->getTestUser()->getUser();
 		$performer = $this->getTestSysop()->getUser();
@@ -188,13 +205,6 @@ class SpecialUserRightsTest extends SpecialPageTestBase {
 		$localUser = $this->getServiceContainer()->getUserFactory()->newFromName( 'WikiAdmin' );
 
 		$externalUsername = $localUser->getName() . '@' . $externalDBname;
-
-		// FIXME: This should benefit from $tablesUsed; until this is possible, purge user_groups on
-		// the other wiki.
-		$externalDbw = $this->getServiceContainer()
-			->getConnectionProvider()
-			->getPrimaryDatabase( $externalDBname );
-		$externalDbw->truncateTable( 'user_groups', __METHOD__ );
 
 		// ensure using SpecialUserRights with external usernames doesn't throw (T342747, T342322)
 		$performer = $this->getTestUser( [ 'bureaucrat' ] );

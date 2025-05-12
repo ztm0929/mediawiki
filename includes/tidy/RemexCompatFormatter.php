@@ -28,6 +28,8 @@ class RemexCompatFormatter extends HtmlFormatter {
 		// Escape non-breaking space
 		$this->attributeEscapes["\u{00A0}"] = '&#160;';
 		$this->textEscapes["\u{00A0}"] = '&#160;';
+		// Escape U+0338 (T387130)
+		$this->textEscapes["\u{0338}"] = '&#x338;';
 		// Disable escaping of '&', because we expect to see entities, due to 'ignoreCharRefs'
 		unset( $this->attributeEscapes["&"] );
 		unset( $this->textEscapes["&"] );
@@ -52,7 +54,7 @@ class RemexCompatFormatter extends HtmlFormatter {
 			|| !isset( $this->rawTextElements[$parent->name] )
 		) {
 			if ( $this->textProcessor !== null ) {
-				$text = call_user_func( $this->textProcessor, $text );
+				$text = ( $this->textProcessor )( $text );
 			}
 		}
 

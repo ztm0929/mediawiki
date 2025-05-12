@@ -20,15 +20,15 @@
 
 namespace MediaWiki\Specials;
 
-use File;
 use MediaWiki\Cache\LinkBatchFactory;
+use MediaWiki\FileRepo\File\File;
+use MediaWiki\FileRepo\RepoGroup;
 use MediaWiki\HTMLForm\HTMLForm;
 use MediaWiki\Language\ILanguageConverter;
 use MediaWiki\Languages\LanguageConverterFactory;
 use MediaWiki\Linker\Linker;
 use MediaWiki\SpecialPage\SpecialPage;
 use MediaWiki\Title\Title;
-use RepoGroup;
 use SearchEngineFactory;
 
 /**
@@ -59,12 +59,6 @@ class SpecialFileDuplicateSearch extends SpecialPage {
 	private SearchEngineFactory $searchEngineFactory;
 	private ILanguageConverter $languageConverter;
 
-	/**
-	 * @param LinkBatchFactory $linkBatchFactory
-	 * @param RepoGroup $repoGroup
-	 * @param SearchEngineFactory $searchEngineFactory
-	 * @param LanguageConverterFactory $languageConverterFactory
-	 */
 	public function __construct(
 		LinkBatchFactory $linkBatchFactory,
 		RepoGroup $repoGroup,
@@ -195,8 +189,7 @@ class SpecialFileDuplicateSearch extends SpecialPage {
 			if ( $file->isLocal() ) {
 				$uploader = $file->getUploader( File::FOR_THIS_USER, $this->getAuthority() );
 				if ( $uploader ) {
-					$batch->add( NS_USER, $uploader->getName() );
-					$batch->add( NS_USER_TALK, $uploader->getName() );
+					$batch->addUser( $uploader );
 				}
 			}
 		}

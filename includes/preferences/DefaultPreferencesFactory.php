@@ -48,6 +48,7 @@ use MediaWiki\Parser\Parser;
 use MediaWiki\Parser\ParserFactory;
 use MediaWiki\Parser\ParserOptions;
 use MediaWiki\Permissions\PermissionManager;
+use MediaWiki\Skin\SkinFactory;
 use MediaWiki\SpecialPage\SpecialPage;
 use MediaWiki\Specials\SpecialWatchlist;
 use MediaWiki\Status\Status;
@@ -59,7 +60,6 @@ use MediaWiki\User\User;
 use MediaWiki\User\UserGroupManager;
 use MediaWiki\User\UserGroupMembership;
 use MediaWiki\User\UserTimeCorrection;
-use MediaWiki\Xml\Xml;
 use MessageLocalizer;
 use OOUI\ButtonWidget;
 use OOUI\FieldLayout;
@@ -69,7 +69,6 @@ use OOUI\MessageWidget;
 use PreferencesFormOOUI;
 use Psr\Log\LoggerAwareTrait;
 use Psr\Log\NullLogger;
-use SkinFactory;
 use UnexpectedValueException;
 use Wikimedia\Rdbms\IDBAccessObject;
 
@@ -571,7 +570,7 @@ class DefaultPreferencesFactory implements PreferencesFactory {
 				] ),
 				'label-message' => 'yourpassword',
 				// email password reset feature only works for users that have an email set up
-				'help' => $user->getEmail()
+				'help-raw' => $user->getEmail()
 					? $context->msg( 'prefs-help-yourpassword',
 						'[[#mw-prefsection-personal-email|{{int:prefs-email}}]]' )->parse()
 					: '',
@@ -885,6 +884,7 @@ class DefaultPreferencesFactory implements PreferencesFactory {
 					'type' => 'toggle',
 					'section' => 'personal/email',
 					'label-message' => 'email-allow-new-users-label',
+					'help-message' => 'prefs-help-email-allow-new-users',
 					'disabled' => $disableEmailPrefs,
 					'disable-if' => [ '!==', 'disablemail', '1' ],
 				];
@@ -1069,7 +1069,7 @@ class DefaultPreferencesFactory implements PreferencesFactory {
 		// Info
 		$now = wfTimestampNow();
 		$lang = $context->getLanguage();
-		$nowlocal = Xml::element( 'span', [ 'id' => 'wpLocalTime' ],
+		$nowlocal = Html::element( 'span', [ 'id' => 'wpLocalTime' ],
 			$lang->userTime( $now, $user ) );
 		$nowserver = $lang->userTime( $now, $user,
 				[ 'format' => false, 'timecorrection' => false ] ) .

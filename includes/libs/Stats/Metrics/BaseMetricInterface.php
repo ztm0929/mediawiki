@@ -55,11 +55,6 @@ interface BaseMetricInterface {
 	 */
 	public function getSampleRate(): float;
 
-	/**
-	 * Sets the sample rate.
-	 *
-	 * @param float $sampleRate
-	 */
 	public function setSampleRate( float $sampleRate ): void;
 
 	/**
@@ -158,7 +153,7 @@ interface BaseMetricInterface {
 	 *
 	 * @param IBufferingStatsdDataFactory|null $statsdDataFactory
 	 *
-	 * @return BaseMetricInterface
+	 * @return self
 	 */
 	public function withStatsdDataFactory( ?IBufferingStatsdDataFactory $statsdDataFactory );
 }

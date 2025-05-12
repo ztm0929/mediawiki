@@ -20,7 +20,7 @@
 
 namespace MediaWiki\Specials;
 
-use ErrorPageError;
+use MediaWiki\Exception\ErrorPageError;
 use MediaWiki\HTMLForm\HTMLForm;
 use MediaWiki\Mail\EmailUserFactory;
 use MediaWiki\MainConfigNames;
@@ -51,13 +51,6 @@ class SpecialEmailUser extends SpecialPage {
 	private EmailUserFactory $emailUserFactory;
 	private UserFactory $userFactory;
 
-	/**
-	 * @param UserNameUtils $userNameUtils
-	 * @param UserNamePrefixSearch $userNamePrefixSearch
-	 * @param UserOptionsLookup $userOptionsLookup
-	 * @param EmailUserFactory $emailUserFactory
-	 * @param UserFactory $userFactory
-	 */
 	public function __construct(
 		UserNameUtils $userNameUtils,
 		UserNamePrefixSearch $userNamePrefixSearch,

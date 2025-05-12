@@ -28,7 +28,6 @@ use Wikimedia\Rdbms\Database;
 use Wikimedia\Rdbms\DatabaseDomain;
 use Wikimedia\Rdbms\IDatabase;
 use Wikimedia\Rdbms\IDatabaseForOwner;
-use Wikimedia\Rdbms\ILBFactory;
 use Wikimedia\Rdbms\IMaintainableDatabase;
 use Wikimedia\Rdbms\IReadableDatabase;
 use Wikimedia\Rdbms\LBFactoryMulti;
@@ -163,6 +162,7 @@ class LBFactoryTest extends MediaWikiIntegrationTestCase {
 		// throw DBTransactionError due to transaction ROUND_* stages being mismatched.hrow
 		// DBTransactionError due to transaction ROUND_* stages being mismatched.
 		$factory->beginPrimaryChanges( __METHOD__ );
+		// phpcs:ignore MediaWiki.Usage.DbrQueryUsage.DbrQueryFound
 		$dbw->query( "SELECT 1 as t", __METHOD__ );
 		$dbw->onTransactionResolution( static function () use ( $factory, &$called ) {
 			++$called;
@@ -208,6 +208,16 @@ class LBFactoryTest extends MediaWikiIntegrationTestCase {
 		$dbw->begin( __METHOD__, $dbw::TRANSACTION_INTERNAL );
 		$this->assertSame( 1, $dbr->trxLevel() );
 		$this->assertSame( 1, $dbw->trxLevel() );
+
+		$factory->commitPrimaryChanges( __METHOD__ );
+		$this->assertSame( 0, $dbr->trxLevel() );
+		$this->assertSame( 0, $dbw->trxLevel() );
+
+		$factory->beginPrimaryChanges( __METHOD__ );
+		// phpcs:ignore MediaWiki.Usage.DbrQueryUsage.DbrQueryFound
+		$dbr->query( 'SELECT 1', __METHOD__ );
+		$this->assertSame( 1, $dbr->trxLevel() );
+		$this->assertSame( 0, $dbw->trxLevel() );
 
 		$factory->commitPrimaryChanges( __METHOD__ );
 		$this->assertSame( 0, $dbr->trxLevel() );
@@ -585,7 +595,6 @@ class LBFactoryTest extends MediaWikiIntegrationTestCase {
 			$this->markTestSkipped( "Not applicable per ATTR_DB_IS_FILE" );
 		}
 
-		/** @var IDatabase $db */
 		$this->assertNotNull( $lb->getConnectionInternal( DB_PRIMARY, [], $lb::DOMAIN_ANY ) );
 	}
 
@@ -683,6 +692,10 @@ class LBFactoryTest extends MediaWikiIntegrationTestCase {
 			$db1->getDomainID()
 		);
 		$this->assertEquals(
+			'extdomain',
+			$factory->getAutoCommitPrimaryConnection( 'virtualdomain1' )->getDomainID()
+		);
+		$this->assertEquals(
 			'extension1',
 			$factory->getLoadBalancer( 'virtualdomain1' )->getClusterName()
 		);
@@ -691,6 +704,10 @@ class LBFactoryTest extends MediaWikiIntegrationTestCase {
 		$this->assertEquals(
 			'localdomain',
 			$db2->getDomainID()
+		);
+		$this->assertEquals(
+			'localdomain',
+			$factory->getAutoCommitPrimaryConnection( 'virtualdomain2' )->getDomainID()
 		);
 		$this->assertEquals(
 			'extension1',
@@ -703,14 +720,22 @@ class LBFactoryTest extends MediaWikiIntegrationTestCase {
 			$db3->getDomainID()
 		);
 		$this->assertEquals(
+			'shareddb',
+			$factory->getAutoCommitPrimaryConnection( 'virtualdomain3' )->getDomainID()
+		);
+		$this->assertEquals(
 			'DEFAULT',
 			$factory->getLoadBalancer( 'virtualdomain3' )->getClusterName()
 		);
 
-		$db3 = $factory->getPrimaryDatabase( 'virtualdomain4' );
+		$db4 = $factory->getPrimaryDatabase( 'virtualdomain4' );
 		$this->assertEquals(
 			'localdomain',
-			$db3->getDomainID()
+			$db4->getDomainID()
+		);
+		$this->assertEquals(
+			'localdomain',
+			$factory->getAutoCommitPrimaryConnection( 'virtualdomain4' )->getDomainID()
 		);
 		$this->assertEquals(
 			'DEFAULT',
@@ -724,33 +749,6 @@ class LBFactoryTest extends MediaWikiIntegrationTestCase {
 		} else {
 			return $db->addIdentifierQuotes( $table );
 		}
-	}
-
-	public function testGetChronologyProtectorTouched() {
-		$store = new HashBagOStuff;
-		$chronologyProtector = new ChronologyProtector( $store, '', false );
-		$chronologyProtector->setRequestInfo( [ 'ChronologyClientId' => 'ii' ] );
-
-		// 2019-02-05T05:03:20Z
-		$mockWallClock = 1549343000.0;
-		$priorTime = $mockWallClock; // reference time
-		$chronologyProtector->setMockTime( $mockWallClock );
-
-		$cpWrap = TestingAccessWrapper::newFromObject( $chronologyProtector );
-		$cpWrap->store->set(
-			$cpWrap->key,
-			$cpWrap->mergePositions(
-				false,
-				[],
-				[ ILBFactory::CLUSTER_MAIN_DEFAULT => $priorTime ]
-			),
-			3600
-		);
-
-		$lbFactory = $this->newLBFactoryMulti( [ 'chronologyProtector' => $chronologyProtector ] );
-		$mockWallClock += 1.0;
-		$touched = $chronologyProtector->getTouched( $lbFactory->getMainLB() );
-		$this->assertEquals( $priorTime, $touched );
 	}
 
 	public function testReconfigureWithOneReplica() {

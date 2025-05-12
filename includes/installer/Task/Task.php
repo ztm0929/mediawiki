@@ -4,6 +4,7 @@ namespace MediaWiki\Installer\Task;
 
 use MediaWiki\HookContainer\HookContainer;
 use MediaWiki\Installer\ConnectionStatus;
+use MediaWiki\Installer\DatabaseCreator;
 use MediaWiki\Language\RawMessage;
 use MediaWiki\MediaWikiServices;
 use MediaWiki\Message\Message;
@@ -137,6 +138,18 @@ abstract class Task {
 	}
 
 	/**
+	 * If this returns true, the task will be scheduled after tasks for which
+	 * it returns false. Subclasses can override this to return true for tasks
+	 * that respond to the successful complete installation of the wiki.
+	 *
+	 * @stable to override
+	 * @return bool
+	 */
+	public function isPostInstall() {
+		return false;
+	}
+
+	/**
 	 * Inject the base class dependencies and configuration
 	 *
 	 * @param ITaskContext $context
@@ -152,8 +165,6 @@ abstract class Task {
 
 	/**
 	 * Get the execution context. This will throw if initBase() has not been called.
-	 *
-	 * @return ITaskContext
 	 */
 	protected function getContext(): ITaskContext {
 		return $this->context;
@@ -232,7 +243,7 @@ abstract class Task {
 	/**
 	 * Get the absolute base path for SQL schema files.
 	 *
-	 * For core tasks, this is $IP/maintenance. For extension tasks, this will
+	 * For core tasks, this is $IP/sql. For extension tasks, this will
 	 * be sql/ under the extension directory.
 	 *
 	 * It would be possible to make the extension path be configurable, but it
@@ -260,15 +271,23 @@ abstract class Task {
 		if ( file_exists( $dbmsSpecificFilePath ) ) {
 			return $dbmsSpecificFilePath;
 		} else {
+			// Some extensions (and core before T382030) store the MySQL schema in the base schema directory.
 			return "$base/$filename";
 		}
 	}
 
 	/**
+	 * Get a helper for creating databases
+	 *
+	 * @return DatabaseCreator
+	 */
+	protected function getDatabaseCreator() {
+		return DatabaseCreator::createInstance( $this->getContext() );
+	}
+
+	/**
 	 * Get the restored services. Subclasses that want to call this must declare
 	 * a dependency on "services".
-	 *
-	 * @return MediaWikiServices
 	 */
 	public function getServices(): MediaWikiServices {
 		$this->assertDependsOn( 'services' );
@@ -279,8 +298,6 @@ abstract class Task {
 	 * Get a HookContainer suitable for calling LoadExtensionSchemaUpdates.
 	 * Subclasses that want to call this must declare a dependency on
 	 * "HookContainer".
-	 *
-	 * @return HookContainer
 	 */
 	public function getHookContainer(): HookContainer {
 		$this->assertDependsOn( 'HookContainer' );
@@ -291,14 +308,15 @@ abstract class Task {
 	 * Get the array of database virtual domains declared in extensions.
 	 * Subclasses that want to call this must declare a dependency on
 	 * "VirtualDomains".
-	 *
-	 * @return array
 	 */
 	public function getVirtualDomains(): array {
 		$this->assertDependsOn( 'VirtualDomains' );
 		return $this->getContext()->getProvision( 'VirtualDomains' );
 	}
 
+	/**
+	 * @param string $dependency
+	 */
 	private function assertDependsOn( $dependency ) {
 		$deps = (array)$this->getDependencies();
 		if ( !in_array( $dependency, $deps, true ) ) {

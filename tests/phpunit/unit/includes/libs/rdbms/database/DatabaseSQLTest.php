@@ -30,11 +30,8 @@ class DatabaseSQLTest extends TestCase {
 	use MediaWikiCoversValidator;
 	use MediaWikiTestCaseTrait;
 
-	/** @var DatabaseTestHelper|Database */
-	private $database;
-
-	/** @var SQLPlatform */
-	private $platform;
+	private DatabaseTestHelper $database;
+	private SQLPlatform $platform;
 
 	protected function setUp(): void {
 		parent::setUp();
@@ -687,7 +684,7 @@ class DatabaseSQLTest extends TestCase {
 			IDatabase::TRIGGER_ROLLBACK => 'tRollback',
 			IDatabase::TRIGGER_CANCEL => 'tCancel',
 		];
-		$pcCallback = function ( IDatabase $db ) use ( $fname ) {
+		$pcCallback = function () use ( $fname ) {
 			$this->database->query( "SELECT 0", $fname );
 		};
 		$callback1 = function ( $trigger = '-' ) use ( $fname, $triggerMap ) {

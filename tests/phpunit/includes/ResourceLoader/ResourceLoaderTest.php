@@ -21,7 +21,7 @@ use Psr\Log\NullLogger;
 use RuntimeException;
 use UnexpectedValueException;
 use Wikimedia\Minify\IdentityMinifierState;
-use Wikimedia\Stats\NullStatsdDataFactory;
+use Wikimedia\Stats\StatsFactory;
 use Wikimedia\TestingAccessWrapper;
 
 /**
@@ -119,6 +119,13 @@ class ResourceLoaderTest extends ResourceLoaderTestCase {
 		$this->expectException( InvalidArgumentException::class );
 		$this->expectExceptionMessage( "name 'test!invalid' is invalid" );
 		$resourceLoader->register( 'test!invalid', [] );
+	}
+
+	public function testRegisterInvalidNameStartingWithDot() {
+		$resourceLoader = new EmptyResourceLoader();
+		$this->expectException( InvalidArgumentException::class );
+		$this->expectExceptionMessage( "name '../test' is invalid" );
+		$resourceLoader->register( '../test', [] );
 	}
 
 	public function testRegisterInvalidType() {
@@ -1340,15 +1347,11 @@ JS
 	}
 
 	public function testMeasureResponseTime() {
-		$stats = $this->getMockBuilder( NullStatsdDataFactory::class )
-			->onlyMethods( [ 'timing' ] )->getMock();
-		$this->setService( 'StatsdDataFactory', $stats );
-
-		$stats->expects( $this->once() )->method( 'timing' )
-			->with( 'resourceloader.responseTime', $this->anything() );
-
+		$statsHelper = StatsFactory::newUnitTestingHelper();
+		$this->setService( 'StatsFactory', $statsHelper->getStatsFactory() );
 		$rl = TestingAccessWrapper::newFromObject( new EmptyResourceLoader );
 		$rl->measureResponseTime();
+		$this->assertSame( 1, $statsHelper->count( 'resourceloader_response_time_seconds' ) );
 	}
 
 	public function testGetUserDefaults() {

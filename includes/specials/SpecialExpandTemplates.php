@@ -34,7 +34,6 @@ use MediaWiki\Status\Status;
 use MediaWiki\Tidy\TidyDriverBase;
 use MediaWiki\Title\Title;
 use MediaWiki\User\Options\UserOptionsLookup;
-use MediaWiki\Xml\Xml;
 
 /**
  * A special page to enter wikitext and expands its templates, parser functions,
@@ -52,11 +51,6 @@ class SpecialExpandTemplates extends SpecialPage {
 	private UserOptionsLookup $userOptionsLookup;
 	private TidyDriverBase $tidy;
 
-	/**
-	 * @param ParserFactory $parserFactory
-	 * @param UserOptionsLookup $userOptionsLookup
-	 * @param TidyDriverBase $tidy
-	 */
 	public function __construct(
 		ParserFactory $parserFactory,
 		UserOptionsLookup $userOptionsLookup,
@@ -79,7 +73,7 @@ class SpecialExpandTemplates extends SpecialPage {
 		$request = $this->getRequest();
 		$input = $request->getText( 'wpInput' );
 
-		if ( strlen( $input ) ) {
+		if ( $input !== '' ) {
 			$removeComments = $request->getBool( 'wpRemoveComments', false );
 			$removeNowiki = $request->getBool( 'wpRemoveNowiki', false );
 			$generateXML = $request->getBool( 'wpGenerateXml' );
@@ -137,12 +131,11 @@ class SpecialExpandTemplates extends SpecialPage {
 			// TODO T371008 consider if using the Content framework makes sense instead of creating the pipeline
 			$rawhtml = MediaWikiServices::getInstance()->getDefaultOutputPipeline()
 				->run( $pout, $options, [ 'enableSectionEditLinks' => false ] )->getContentHolderText();
-			if ( $generateRawHtml && strlen( $rawhtml ) > 0 ) {
-				// @phan-suppress-next-line SecurityCheck-DoubleEscaped Wanted here to display the html
+			if ( $generateRawHtml && $rawhtml !== '' ) {
 				$out->addHTML( $this->makeOutput( $rawhtml, 'expand_templates_html_output' ) );
 			}
 
-			$this->showHtmlPreview( $title, $pout, $out );
+			$this->showHtmlPreview( $title, $pout, $options, $out );
 		} else {
 			$this->makeForm();
 		}
@@ -158,7 +151,7 @@ class SpecialExpandTemplates extends SpecialPage {
 	 */
 	public function onSubmitInput( array $values ) {
 		$status = Status::newGood();
-		if ( !strlen( $values['Input'] ) ) {
+		if ( $values['Input'] === '' ) {
 			$status = Status::newFatal( 'expand_templates_input_missing' );
 		}
 		return $status;
@@ -225,13 +218,13 @@ class SpecialExpandTemplates extends SpecialPage {
 	 */
 	private function makeOutput( $output, $heading = 'expand_templates_output' ) {
 		$out = "<h2>" . $this->msg( $heading )->escaped() . "</h2>\n";
-		$out .= Xml::textarea(
+		$out .= Html::textarea(
 			'output',
 			$output,
-			10,
-			10,
 			[
 				'id' => 'output',
+				'cols' => 10,
+				'rows' => 10,
 				'readonly' => 'readonly',
 				'class' => 'mw-editfont-' . $this->userOptionsLookup->getOption( $this->getUser(), 'editfont' )
 			]
@@ -245,9 +238,10 @@ class SpecialExpandTemplates extends SpecialPage {
 	 *
 	 * @param Title $title
 	 * @param ParserOutput $pout
+	 * @param ParserOptions $popts
 	 * @param OutputPage $out
 	 */
-	private function showHtmlPreview( Title $title, ParserOutput $pout, OutputPage $out ) {
+	private function showHtmlPreview( Title $title, ParserOutput $pout, ParserOptions $popts, OutputPage $out ) {
 		$out->addHTML( "<h2>" . $this->msg( 'expand_templates_preview' )->escaped() . "</h2>\n" );
 
 		if ( $this->getConfig()->get( MainConfigNames::RawHtml ) ) {
@@ -278,7 +272,7 @@ class SpecialExpandTemplates extends SpecialPage {
 			}
 		}
 
-		$out->addParserOutputContent( $pout, [ 'enableSectionEditLinks' => false ] );
+		$out->addParserOutputContent( $pout, $popts, [ 'enableSectionEditLinks' => false ] );
 		$out->addCategoryLinks( $pout->getCategoryMap() );
 	}
 

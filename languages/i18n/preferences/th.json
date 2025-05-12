@@ -107,8 +107,8 @@
 	"prefs-description-rendering": "กำหนดค่าตัวเลือกสกิน ขนาด และการอ่าน",
 	"prefs-skin": "แบบหน้าตา",
 	"skin-preview": "ตัวอย่าง",
-	"prefs-common-config": "CSS/จาวาสคริปต์รวมสำหรับทุกหน้าตา:",
-	"prefs-custom-css": "CSS กำหนดเอง",
+	"prefs-common-config": "ซีเอสเอส/จาวาสคริปต์รวมสำหรับทุกหน้าตา:",
+	"prefs-custom-css": "ซีเอสเอสกำหนดเอง",
 	"prefs-custom-js": "จาวาสคริปต์กำหนดเอง",
 	"prefs-custom-cssjs-safemode": "โค้ด CSS และ JavaScript ที่ปรับแต่งเองไม่พร้อมใช้งานเนื่องจากโหมดปลอดภัยเปิดอยู่ [[#mw-input-wpforcesafemode|ปิดโหมดปลอดภัย]]เพื่อเปิดใช้งานอีกครั้ง",
 	"prefs-skin-prefs": "การตั้งค่าแบบหน้าตา",
@@ -233,6 +233,7 @@
 	"search-thumbnail-extra-namespaces-label": "แสดงรูปย่อใน พิเศษ:ค้นหา บนคอมพิวเตอร์ตั้งโต๊ะ",
 	"search-thumbnail-extra-namespaces-message": "แสดงผลรูปย่อสำหรับผลลัพธ์ใน{{PLURAL:$2|เนมสเปซ}} $1 บนหน้า{{#special:search}}",
 	"prefs-advancedsearchoptions": "ตัวเลือกขั้นสูง",
+	"prefs-misc": "เบ็ดเตล็ด",
 	"prefs-reset-intro": "คุณสามารถใช้หน้านี้ตั้งการตั้งค่าของคุณเป็นค่าปริยายของเว็บใหม่\nไม่สามารถทำกลับได้",
 	"prefs-reset-confirm": "ใช่ ฉันต้องการรีเซ็ตการตั้งค่าของฉัน",
 	"restoreprefs": "คืนการตั้งค่าเริ่มต้นทั้งหมด"

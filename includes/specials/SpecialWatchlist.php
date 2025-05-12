@@ -20,17 +20,19 @@
 
 namespace MediaWiki\Specials;
 
-use ChangesList;
-use ChangesListBooleanFilterGroup;
-use ChangesListStringOptionsFilterGroup;
-use EnhancedChangesList;
-use LogPage;
 use MediaWiki\ChangeTags\ChangeTagsStore;
 use MediaWiki\Context\IContextSource;
+use MediaWiki\Exception\UserNotLoggedIn;
 use MediaWiki\Html\FormOptions;
 use MediaWiki\Html\Html;
+use MediaWiki\Logging\LogPage;
 use MediaWiki\MainConfigNames;
 use MediaWiki\MediaWikiServices;
+use MediaWiki\RecentChanges\ChangesList;
+use MediaWiki\RecentChanges\ChangesListBooleanFilterGroup;
+use MediaWiki\RecentChanges\ChangesListStringOptionsFilterGroup;
+use MediaWiki\RecentChanges\EnhancedChangesList;
+use MediaWiki\RecentChanges\RecentChange;
 use MediaWiki\Request\DerivativeRequest;
 use MediaWiki\SpecialPage\ChangesListSpecialPage;
 use MediaWiki\SpecialPage\SpecialPage;
@@ -42,10 +44,7 @@ use MediaWiki\User\UserIdentityUtils;
 use MediaWiki\Watchlist\WatchedItem;
 use MediaWiki\Watchlist\WatchedItemStoreInterface;
 use MediaWiki\Watchlist\WatchlistManager;
-use MediaWiki\Xml\Xml;
 use MediaWiki\Xml\XmlSelect;
-use RecentChange;
-use UserNotLoggedIn;
 use Wikimedia\Message\MessageValue;
 use Wikimedia\Rdbms\IReadableDatabase;
 use Wikimedia\Rdbms\IResultWrapper;
@@ -83,11 +82,6 @@ class SpecialWatchlist extends ChangesListSpecialPage {
 	private $currentMode;
 	private ChangeTagsStore $changeTagsStore;
 
-	/**
-	 * @param WatchedItemStoreInterface $watchedItemStore
-	 * @param WatchlistManager $watchlistManager
-	 * @param UserOptionsLookup $userOptionsLookup
-	 */
 	public function __construct(
 		WatchedItemStoreInterface $watchedItemStore,
 		WatchlistManager $watchlistManager,
@@ -707,18 +701,18 @@ class SpecialWatchlist extends ChangesListSpecialPage {
 
 		$form = '';
 
-		$form .= Xml::openElement( 'form', [
+		$form .= Html::openElement( 'form', [
 			'method' => 'get',
 			'action' => wfScript(),
 			'id' => 'mw-watchlist-form'
 		] );
 		$form .= Html::hidden( 'title', $this->getPageTitle()->getPrefixedText() );
-		$form .= Xml::openElement(
+		$form .= Html::openElement(
 			'fieldset',
 			[ 'id' => 'mw-watchlist-options', 'class' => 'cloptions' ]
 		);
-		$form .= Xml::element(
-			'legend', null, $this->msg( 'watchlist-options' )->text()
+		$form .= Html::element(
+			'legend', [], $this->msg( 'watchlist-options' )->text()
 		);
 
 		if ( !$this->isStructuredFilterUiEnabled() ) {
@@ -742,7 +736,7 @@ class SpecialWatchlist extends ChangesListSpecialPage {
 		$nondefaults = $opts->getChangedValues();
 		$cutofflinks = Html::rawElement(
 			'span',
-			[ 'class' => 'cldays cloption' ],
+			[ 'class' => [ 'cldays', 'cloption' ] ],
 			$this->msg( 'wlshowtime' ) . ' ' . $this->cutoffselector( $opts )
 		);
 
@@ -806,19 +800,19 @@ class SpecialWatchlist extends ChangesListSpecialPage {
 		] ) . '&nbsp;' . $this->msg( 'namespace_association' )->escaped() ) . "\n";
 		$form .= Html::rawElement(
 			'span',
-			[ 'class' => 'namespaceForm cloption' ],
+			[ 'class' => [ 'namespaceForm', 'cloption' ] ],
 			$namespaceForm
 		);
 
-		$form .= Xml::submitButton(
+		$form .= Html::submitButton(
 			$this->msg( 'watchlist-submit' )->text(),
 			[ 'class' => 'cloption-submit' ]
 		) . "\n";
 		foreach ( $hiddenFields as $key => $value ) {
 			$form .= Html::hidden( $key, $value ) . "\n";
 		}
-		$form .= Xml::closeElement( 'fieldset' ) . "\n";
-		$form .= Xml::closeElement( 'form' ) . "\n";
+		$form .= Html::closeElement( 'fieldset' ) . "\n";
+		$form .= Html::closeElement( 'form' ) . "\n";
 
 		// Insert a placeholder for RCFilters
 		if ( $this->isStructuredFilterUiEnabled() ) {
@@ -854,7 +848,7 @@ class SpecialWatchlist extends ChangesListSpecialPage {
 		$this->setBottomText( $opts );
 	}
 
-	private function cutoffselector( $options ) {
+	private function cutoffselector( FormOptions $options ): string {
 		$selected = (float)$options['days'];
 		$maxDays = $this->getConfig()->get( MainConfigNames::RCMaxAge ) / ( 3600 * 24 );
 		if ( $selected <= 0 ) {
@@ -927,17 +921,17 @@ class SpecialWatchlist extends ChangesListSpecialPage {
 		);
 
 		if ( $numItems > 0 && $showUpdatedMarker ) {
-			$form .= Xml::openElement( 'form', [ 'method' => 'post',
+			$form .= Html::openElement( 'form', [ 'method' => 'post',
 				'action' => $this->getPageTitle()->getLocalURL(),
 				'id' => 'mw-watchlist-resetbutton' ] ) . "\n" .
-			Xml::submitButton( $this->msg( 'enotif_reset' )->text(),
+			Html::submitButton( $this->msg( 'enotif_reset' )->text(),
 				[ 'name' => 'mw-watchlist-reset-submit' ] ) . "\n" .
 			Html::hidden( 'token', $user->getEditToken() ) . "\n" .
 			Html::hidden( 'reset', 'all' ) . "\n";
 			foreach ( $nondefaults as $key => $value ) {
 				$form .= Html::hidden( $key, $value ) . "\n";
 			}
-			$form .= Xml::closeElement( 'form' ) . "\n";
+			$form .= Html::closeElement( 'form' ) . "\n";
 		}
 
 		$this->getOutput()->addHTML( $form );
@@ -946,7 +940,7 @@ class SpecialWatchlist extends ChangesListSpecialPage {
 	protected function showHideCheck( $options, $message, $name, $value, $inStructuredUi ) {
 		$options[$name] = 1 - (int)$value;
 
-		$attribs = [ 'class' => 'mw-input-with-label clshowhideoption cloption' ];
+		$attribs = [ 'class' => [ 'mw-input-with-label', 'clshowhideoption', 'cloption' ] ];
 		if ( $inStructuredUi ) {
 			$attribs[ 'data-feature-in-structured-ui' ] = true;
 		}
@@ -998,30 +992,18 @@ class SpecialWatchlist extends ChangesListSpecialPage {
 		);
 	}
 
-	/**
-	 * @return string
-	 */
 	protected function getLimitPreferenceName(): string {
 		return 'wllimit';
 	}
 
-	/**
-	 * @return string
-	 */
 	protected function getSavedQueriesPreferenceName(): string {
 		return 'rcfilters-wl-saved-queries';
 	}
 
-	/**
-	 * @return string
-	 */
 	protected function getDefaultDaysPreferenceName(): string {
 		return 'watchlistdays';
 	}
 
-	/**
-	 * @return string
-	 */
 	protected function getCollapsedPreferenceName(): string {
 		return 'rcfilters-wl-collapsed';
 	}

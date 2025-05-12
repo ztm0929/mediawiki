@@ -1,34 +1,62 @@
 {
-	"description": "Schema for wiki pages.",
+	"x-i18n-description": "rest-schema-desc-new-page",
 	"required": [
-		"source",
+		"id",
 		"title",
-		"comment",
+		"key",
+		"latest",
+		"license",
 		"content_model",
-		"token"
+		"source"
 	],
 	"properties": {
-		"source": {
-			"type": "string",
-			"description": "Page content in the format specified by the content_model property"
+		"id": {
+			"type": "integer",
+			"x-i18n-description": "rest-property-desc-page-id"
 		},
 		"title": {
 			"type": "string",
-			"description": "Page title"
+			"x-i18n-description": "rest-property-desc-page-title"
 		},
-		"comment": {
+		"key": {
 			"type": "string",
-			"description": "Reason for creating the page."
+			"x-i18n-description": "rest-property-desc-page-key"
+		},
+		"latest": {
+			"type": "object",
+			"x-i18n-description": "rest-property-desc-page-latest",
+			"properties": {
+				"id": {
+					"type": "integer",
+					"x-i18n-description": "rest-property-desc-page-latest-id"
+				},
+				"timestamp": {
+					"type": "string",
+					"x-i18n-description": "rest-property-desc-page-timestamp"
+				}
+			}
+		},
+		"license": {
+			"type": "object",
+			"x-i18n-description": "rest-property-desc-page-license",
+			"properties": {
+				"url": {
+					"type": "string",
+					"x-i18n-description": "rest-property-desc-page-license-url"
+				},
+				"title": {
+					"type": "string",
+					"x-i18n-description": "rest-property-desc-page-license-title"
+				}
+			}
 		},
 		"content_model": {
 			"type": "string",
-			"nullable": true,
-			"description": "Page content type"
+			"x-i18n-description": "rest-property-desc-page-contentmodel"
 		},
-		"token": {
+		"source": {
 			"type": "string",
-			"nullable": true,
-			"description": "CSRF token required when using cookie-based authentication."
+			"x-i18n-description": "rest-param-desc-update-source"
 		}
 	}
 }

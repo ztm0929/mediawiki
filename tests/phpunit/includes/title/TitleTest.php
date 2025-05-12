@@ -2,10 +2,12 @@
 
 use MediaWiki\Cache\BacklinkCache;
 use MediaWiki\Content\WikitextContent;
+use MediaWiki\Exception\MWException;
 use MediaWiki\Language\RawMessage;
 use MediaWiki\Linker\LinkTarget;
 use MediaWiki\MainConfigNames;
 use MediaWiki\Message\Message;
+use MediaWiki\Page\Article;
 use MediaWiki\Page\PageIdentity;
 use MediaWiki\Page\PageIdentityValue;
 use MediaWiki\Tests\Unit\DummyServicesTrait;
@@ -144,7 +146,7 @@ class TitleTest extends MediaWikiIntegrationTestCase {
 		$this->assertEquals( $expectedBool, $title->hasSubjectNamespace( $ns ) );
 	}
 
-	public function dataGetContentModel() {
+	public static function provideGetContentModel() {
 		return [
 			[ 'Help:Foo', CONTENT_MODEL_WIKITEXT ],
 			[ 'Help:Foo.js', CONTENT_MODEL_WIKITEXT ],
@@ -170,7 +172,7 @@ class TitleTest extends MediaWikiIntegrationTestCase {
 	}
 
 	/**
-	 * @dataProvider dataGetContentModel
+	 * @dataProvider provideGetContentModel
 	 * @covers \MediaWiki\Title\Title::getContentModel
 	 */
 	public function testGetContentModel( $title, $expectedModelId ) {
@@ -179,7 +181,7 @@ class TitleTest extends MediaWikiIntegrationTestCase {
 	}
 
 	/**
-	 * @dataProvider dataGetContentModel
+	 * @dataProvider provideGetContentModel
 	 * @covers \MediaWiki\Title\Title::hasContentModel
 	 */
 	public function testHasContentModel( $title, $expectedModelId ) {
@@ -862,7 +864,7 @@ class TitleTest extends MediaWikiIntegrationTestCase {
 	 * See also mediawiki.Title.test.js
 	 * @covers \MediaWiki\Title\Title::secureAndSplit
 	 * @dataProvider provideValidSecureAndSplit
-	 * @note This mainly tests MediaWikiTitleCodec::parseTitle().
+	 * @note This mainly tests TitleParser::parseTitle().
 	 */
 	public function testSecureAndSplitValid( $text ) {
 		$this->assertInstanceOf( Title::class, Title::newFromText( $text ), "Valid: $text" );
@@ -872,7 +874,7 @@ class TitleTest extends MediaWikiIntegrationTestCase {
 	 * See also mediawiki.Title.test.js
 	 * @covers \MediaWiki\Title\Title::secureAndSplit
 	 * @dataProvider provideInvalidSecureAndSplit
-	 * @note This mainly tests MediaWikiTitleCodec::parseTitle().
+	 * @note This mainly tests TitleParser::parseTitle().
 	 */
 	public function testSecureAndSplitInvalid( $text, $expectedErrorMessage ) {
 		try {
@@ -1798,7 +1800,6 @@ class TitleTest extends MediaWikiIntegrationTestCase {
 	public function testNewMainPage() {
 		$mock = $this->createMock( MessageCache::class );
 		$mock->method( 'get' )->willReturn( 'Foresheet' );
-		$mock->method( 'transform' )->willReturn( 'Foresheet' );
 
 		$this->setService( 'MessageCache', $mock );
 
@@ -1816,7 +1817,6 @@ class TitleTest extends MediaWikiIntegrationTestCase {
 	public function testNewMainPageNoRecursion() {
 		$mock = $this->createMock( MessageCache::class );
 		$mock->method( 'get' )->willReturn( 'localtestiw:' );
-		$mock->method( 'transform' )->willReturn( 'localtestiw:' );
 		$this->setService( 'MessageCache', $mock );
 
 		$this->assertSame(

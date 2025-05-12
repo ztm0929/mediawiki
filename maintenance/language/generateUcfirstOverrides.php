@@ -31,6 +31,7 @@
  * @ingroup MaintenanceLanguage
  */
 
+use MediaWiki\Maintenance\Maintenance;
 use Wikimedia\StaticArrayWriter;
 
 // @codeCoverageIgnoreStart
@@ -74,7 +75,8 @@ class GenerateUcfirstOverrides extends Maintenance {
 		);
 	}
 
-	private function loadJson( $filename ) {
+	/** @return mixed */
+	private function loadJson( string $filename ) {
 		$data = file_get_contents( $filename );
 		if ( $data === false ) {
 			$msg = sprintf( "Could not load data from file '%s'\n", $filename );

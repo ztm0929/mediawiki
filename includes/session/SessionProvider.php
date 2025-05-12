@@ -23,17 +23,22 @@
 
 namespace MediaWiki\Session;
 
-use ErrorPageError;
 use InvalidArgumentException;
 use MediaWiki\Api\ApiUsageException;
 use MediaWiki\Config\Config;
 use MediaWiki\Context\RequestContext;
+use MediaWiki\Exception\ErrorPageError;
 use MediaWiki\HookContainer\HookContainer;
 use MediaWiki\HookContainer\HookRunner;
 use MediaWiki\Language\Language;
 use MediaWiki\MainConfigNames;
 use MediaWiki\Message\Message;
 use MediaWiki\Request\WebRequest;
+use MediaWiki\Rest\Handler;
+use MediaWiki\Rest\HttpException;
+use MediaWiki\Rest\LocalizedHttpException;
+use MediaWiki\Rest\Module\Module;
+use MediaWiki\Rest\RequestInterface;
 use MediaWiki\User\User;
 use MediaWiki\User\UserNameUtils;
 use MWRestrictions;
@@ -41,6 +46,7 @@ use Psr\Log\LoggerInterface;
 use Stringable;
 use Wikimedia\Message\MessageParam;
 use Wikimedia\Message\MessageSpecifier;
+use Wikimedia\Message\MessageValue;
 
 /**
  * A SessionProvider provides SessionInfo and support for Session
@@ -224,11 +230,6 @@ abstract class SessionProvider implements Stringable, SessionProviderInterface {
 		$this->hookRunner = new HookRunner( $hookContainer );
 	}
 
-	/**
-	 * Get the HookContainer
-	 *
-	 * @return HookContainer
-	 */
 	protected function getHookContainer(): HookContainer {
 		return $this->hookContainer;
 	}
@@ -732,7 +733,16 @@ abstract class SessionProvider implements Stringable, SessionProviderInterface {
 				}
 			);
 		} elseif ( defined( 'MW_REST_API' ) ) {
-			// There are no suitable hooks in the REST API (T252591)
+			$this->hookContainer->register(
+				'RestCheckCanExecute',
+				static function ( Module $module, Handler $handler, string $path,
+					RequestInterface $request, ?HttpException &$error ) use ( $key, $params )
+				{
+					$msg = new MessageValue( $key, $params );
+					$error = new LocalizedHttpException( $msg, 403 );
+					return false;
+				}
+			);
 		} else {
 			$this->hookContainer->register(
 				'BeforeInitialize',

@@ -21,16 +21,16 @@ class SqliteCreateSearchIndexTask extends Task {
 		$module = DatabaseSqlite::getFulltextSearchModule();
 		$searchIndexSql = (string)$db->newSelectQueryBuilder()
 			->select( 'sql' )
-			->from( $db->addIdentifierQuotes( 'sqlite_master' ) )
+			->from( 'sqlite_master' )
 			->where( [ 'tbl_name' => $db->tableName( 'searchindex', 'raw' ) ] )
 			->caller( __METHOD__ )->fetchField();
 		$fts3tTable = ( stristr( $searchIndexSql, 'fts' ) !== false );
 
 		if ( $fts3tTable && !$module ) {
 			$status->warning( 'config-sqlite-fts3-downgrade' );
-			$this->applySourceFile( $db, 'archives/searchindex-no-fts.sql' );
+			$this->applySourceFile( $db, 'searchindex-no-fts.sql' );
 		} elseif ( !$fts3tTable && $module == 'FTS3' ) {
-			$this->applySourceFile( $db, 'archives/searchindex-fts3.sql' );
+			$this->applySourceFile( $db, 'searchindex-fts3.sql' );
 		}
 
 		return $status;

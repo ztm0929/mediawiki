@@ -436,7 +436,7 @@ ApiSandboxLayout.prototype.loadParamInfo = function () {
 				deprecatedItems = [],
 				buttons = [],
 				filterFmModules = ( v ) => v.slice( -2 ) !== 'fm' ||
-					!Object.prototype.hasOwnProperty.call( ApiSandbox.availableFormats, v.slice( 0, v.length - 2 ) );
+					!Object.prototype.hasOwnProperty.call( ApiSandbox.availableFormats, v.slice( 0, -2 ) );
 
 			// This is something of a hack. We always want the 'format' and
 			// 'action' parameters from the main module to be specified,
@@ -661,7 +661,7 @@ ApiSandboxLayout.prototype.apiCheckValid = function () {
 		// eslint-disable-next-line no-jquery/no-map-util
 		const promises = $.map( this.widgets, ( widget ) => widget.apiCheckValid( ApiSandbox.suppressErrors ) );
 		$.when( ...promises ).then( ( ...results ) => {
-			this.apiIsValid = results.indexOf( false ) === -1;
+			this.apiIsValid = !results.includes( false );
 			if ( this.getOutlineItem() ) {
 				this.getOutlineItem().setIcon( this.apiIsValid || ApiSandbox.suppressErrors ? null : 'alert' );
 				this.getOutlineItem().setTitle(

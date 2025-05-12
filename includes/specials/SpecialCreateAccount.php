@@ -20,8 +20,8 @@
 
 namespace MediaWiki\Specials;
 
-use ErrorPageError;
 use MediaWiki\Auth\AuthManager;
+use MediaWiki\Exception\ErrorPageError;
 use MediaWiki\Language\FormatterFactory;
 use MediaWiki\Logger\LoggerFactory;
 use MediaWiki\SpecialPage\LoginSignupSpecialPage;
@@ -54,10 +54,6 @@ class SpecialCreateAccount extends LoginSignupSpecialPage {
 
 	private UserIdentityUtils $identityUtils;
 
-	/**
-	 * @param AuthManager $authManager
-	 * @param FormatterFactory $formatterFactory
-	 */
 	public function __construct(
 		AuthManager $authManager,
 		FormatterFactory $formatterFactory,

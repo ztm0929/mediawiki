@@ -26,6 +26,7 @@
  * @ingroup Media
  */
 
+use MediaWiki\FileRepo\File\File;
 use MediaWiki\HookContainer\HookRunner;
 use MediaWiki\MainConfigNames;
 use MediaWiki\MediaWikiServices;
@@ -158,7 +159,7 @@ abstract class TransformationalImageHandler extends ImageHandler {
 		}
 
 		wfDebug( __METHOD__ . ": creating {$scalerParams['physicalDimensions']} " .
-			"thumbnail at $dstPath using scaler $scalerName" );
+			"thumbnail of {$image->getPath()} at $dstPath using scaler $scalerName" );
 
 		if ( !$image->mustRender() &&
 			$scalerParams['physicalWidth'] == $scalerParams['srcWidth']
@@ -244,7 +245,7 @@ abstract class TransformationalImageHandler extends ImageHandler {
 		// path.
 		if ( is_array( $scaler ) && is_callable( $scaler ) ) {
 			// Allow subclasses to specify their own rendering methods.
-			$err = call_user_func( $scaler, $image, $scalerParams );
+			$err = $scaler( $image, $scalerParams );
 		} else {
 			switch ( $scaler ) {
 				case 'hookaborted':

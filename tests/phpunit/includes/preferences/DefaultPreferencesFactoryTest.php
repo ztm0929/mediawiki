@@ -20,6 +20,8 @@ use MediaWiki\Preferences\DefaultPreferencesFactory;
 use MediaWiki\Preferences\SignatureValidatorFactory;
 use MediaWiki\Request\FauxRequest;
 use MediaWiki\Session\SessionId;
+use MediaWiki\Skin\Skin;
+use MediaWiki\Skin\SkinFactory;
 use MediaWiki\Tests\Session\TestUtils;
 use MediaWiki\Tests\Unit\DummyServicesTrait;
 use MediaWiki\Title\NamespaceInfo;
@@ -288,7 +290,7 @@ class DefaultPreferencesFactoryTest extends \MediaWikiIntegrationTestCase {
 		);
 	}
 
-	public function emailAuthenticationProvider() {
+	public static function emailAuthenticationProvider() {
 		$userNoEmail = new User;
 		$userEmailUnauthed = new User;
 		$userEmailUnauthed->setEmail( 'noauth@example.org' );
@@ -491,10 +493,6 @@ class DefaultPreferencesFactoryTest extends \MediaWikiIntegrationTestCase {
 		return $mock;
 	}
 
-	/**
-	 * @param MockObject $userMock
-	 * @return MockObject
-	 */
 	private function getUserMockWithSession( MockObject $userMock ): MockObject {
 		// We're mocking a stdClass because the Session class is final, and thus not mockable.
 		$mock = $this->getMockBuilder( stdClass::class )

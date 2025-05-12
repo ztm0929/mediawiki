@@ -38,10 +38,22 @@ abstract class BundleSizeTestBase extends MediaWikiIntegrationTestCase {
 		'mw.loader.impl' => 17
 	];
 
-	public function provideBundleSize() {
-		foreach ( json_decode( file_get_contents( $this->getBundleSizeConfig() ), true ) as $testCase ) {
+	public static function provideBundleSize() {
+		$content = json_decode( file_get_contents( static::getBundleSizeConfigData() ), true );
+
+		foreach ( $content as $testCase ) {
 			yield $testCase['resourceModule'] => [ $testCase ];
 		}
+	}
+
+	private static function stringToFloat( string $maxSize ): float {
+		if ( str_contains( $maxSize, 'KB' ) || str_contains( $maxSize, 'kB' ) ) {
+			$maxSize = (float)str_replace( [ 'KB', 'kB', ' KB', ' kB' ], '', $maxSize );
+			$maxSize = $maxSize * 1024;
+		} elseif ( str_contains( $maxSize, 'B' ) ) {
+			$maxSize = (float)str_replace( [ ' B', 'B' ], '', $maxSize );
+		}
+		return $maxSize;
 	}
 
 	/**
@@ -49,16 +61,23 @@ abstract class BundleSizeTestBase extends MediaWikiIntegrationTestCase {
 	 * @coversNothing
 	 */
 	public function testBundleSize( $testCase ) {
-		$maxSize = $testCase['maxSize'];
+		$maxSizeUncompressed = $testCase['maxSizeUncompressed'] ?? null;
+		$maxSize = $testCase['maxSize'] ?? null;
 		$projectName = $testCase['projectName'] ?? '';
 		$moduleName = $testCase['resourceModule'];
+		if ( $maxSize === null && $maxSizeUncompressed === null ) {
+			$this->markTestSkipped( "The module $moduleName has opted out of bundle size testing." );
+			return;
+		}
+		$this->assertFalse(
+			$maxSize !== null && $maxSizeUncompressed !== null,
+			'Only maxSize or maxSizeCompressed should be defined for module ' . $moduleName . '. Only defined maxSizeCompressed.'
+		);
 		if ( is_string( $maxSize ) ) {
-			if ( str_contains( $maxSize, 'KB' ) || str_contains( $maxSize, 'kB' ) ) {
-				$maxSize = (float)str_replace( [ 'KB', 'kB', ' KB', ' kB' ], '', $maxSize );
-				$maxSize = $maxSize * 1024;
-			} elseif ( str_contains( $maxSize, 'B' ) ) {
-				$maxSize = (float)str_replace( [ ' B', 'B' ], '', $maxSize );
-			}
+			$maxSize = self::stringToFloat( $maxSize );
+		}
+		if ( is_string( $maxSizeUncompressed ) ) {
+			$maxSizeUncompressed = self::stringToFloat( $maxSizeUncompressed );
 		}
 		$resourceLoader = MediaWikiServices::getInstance()->getResourceLoader();
 		$resourceLoader->setDependencyStore( new DependencyStore( new HashBagOStuff() ) );
@@ -79,18 +98,27 @@ abstract class BundleSizeTestBase extends MediaWikiIntegrationTestCase {
 				: Module::TYPE_COMBINED
 		);
 		$content = $resourceLoader->makeModuleResponse( $context, [ $moduleName => $module ] );
+		$contentTransferSizeUncompressed = strlen( $content );
 		$contentTransferSize = strlen( gzencode( $content, 9 ) );
 		$contentTransferSize -= array_sum( self::CORE_SIZE_ADJUSTMENTS );
-		$message = $projectName ?
-			"$projectName: $moduleName is less than $maxSize" :
-			"$moduleName is less than $maxSize";
-		$this->assertLessThan( $maxSize, $contentTransferSize, $message );
+		if ( $maxSize ) {
+			$message = $projectName ?
+				"$projectName: $moduleName is less than $maxSize" :
+				"$moduleName is less than $maxSize";
+			$this->assertLessThan( $maxSize, $contentTransferSize, $message );
+		}
+		if ( $maxSizeUncompressed ) {
+			$messageUncompressed = $projectName ?
+				"$projectName: $moduleName is less than $maxSize (uncompressed)" :
+				"$moduleName is less than $maxSizeUncompressed";
+			$this->assertLessThan( $maxSizeUncompressed, $contentTransferSizeUncompressed, $messageUncompressed );
+		}
 	}
 
 	/**
 	 * @return string Path to bundlesize.config.json
 	 */
-	abstract public function getBundleSizeConfig(): string;
+	abstract public static function getBundleSizeConfigData(): string;
 
 	/**
 	 * @return string Skin name

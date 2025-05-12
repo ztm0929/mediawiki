@@ -1,7 +1,5 @@
 <?php
 /**
- * DBMS-specific updater helper.
- *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -18,23 +16,18 @@
  * http://www.gnu.org/copyleft/gpl.html
  *
  * @file
- * @ingroup Installer
  */
 
 namespace MediaWiki\Installer;
 
-use AutoLoader;
 use CleanupEmptyCategories;
 use DeleteDefaultMessages;
 use LogicException;
 use MediaWiki\HookContainer\HookContainer;
 use MediaWiki\HookContainer\HookRunner;
-use MediaWiki\HookContainer\StaticHookRegistry;
-use MediaWiki\MainConfigNames;
 use MediaWiki\Maintenance\FakeMaintenance;
 use MediaWiki\Maintenance\Maintenance;
 use MediaWiki\MediaWikiServices;
-use MediaWiki\Registration\ExtensionRegistry;
 use MediaWiki\ResourceLoader\MessageBlobStore;
 use MediaWiki\SiteStats\SiteStatsInit;
 use MigrateLinksTable;
@@ -45,12 +38,13 @@ use UnexpectedValueException;
 use UpdateCollation;
 use Wikimedia\Rdbms\IDatabase;
 use Wikimedia\Rdbms\IMaintainableDatabase;
+use Wikimedia\Rdbms\LBFactory;
 use Wikimedia\Rdbms\Platform\ISQLPlatform;
 
 require_once __DIR__ . '/../../maintenance/Maintenance.php';
 
 /**
- * Class for handling database updates.
+ * Apply database changes after updating MediaWiki.
  *
  * @ingroup Installer
  * @since 1.17
@@ -126,6 +120,12 @@ abstract class DatabaseUpdater {
 	protected $skipSchema = false;
 
 	/**
+	 * The virtual domain currently being acted on
+	 * @var string|null
+	 */
+	private $currentVirtualDomain = null;
+
+	/**
 	 * @param IMaintainableDatabase &$db To perform updates on
 	 * @param bool $shared Whether to perform updates on shared tables
 	 * @param Maintenance|null $maintenance Maintenance object which created us
@@ -174,50 +174,10 @@ abstract class DatabaseUpdater {
 			// Running under update.php: use the global locator
 			return MediaWikiServices::getInstance()->getHookContainer();
 		}
-		$vars = Installer::getExistingLocalSettings();
-
-		$registry = ExtensionRegistry::getInstance();
-		$queue = $registry->getQueue();
-		// Don't accidentally load extensions in the future
-		$registry->clearQueue();
-
-		// Read extension.json files
-		$extInfo = $registry->readFromQueue( $queue );
-
-		// Merge extension attribute hooks with hooks defined by a .php
-		// registration file included from LocalSettings.php
-		$legacySchemaHooks = $extInfo['globals']['wgHooks']['LoadExtensionSchemaUpdates'] ?? [];
-		if ( $vars && isset( $vars['wgHooks']['LoadExtensionSchemaUpdates'] ) ) {
-			$legacySchemaHooks = array_merge( $legacySchemaHooks, $vars['wgHooks']['LoadExtensionSchemaUpdates'] );
-		}
-
-		// Register classes defined by extensions that are loaded by including of a file that
-		// updates global variables, rather than having an extension.json manifest.
-		if ( $vars && isset( $vars['wgAutoloadClasses'] ) ) {
-			AutoLoader::registerClasses( $vars['wgAutoloadClasses'] );
-		}
-
-		// Register class definitions from extension.json files
-		if ( !isset( $extInfo['autoloaderPaths'] )
-			|| !isset( $extInfo['autoloaderClasses'] )
-			|| !isset( $extInfo['autoloaderNS'] )
-		) {
-			// NOTE: protect against changes to the structure of $extInfo.
-			// It's volatile, and this usage is easy to miss.
-			throw new LogicException( 'Missing autoloader keys from extracted extension info' );
-		}
-		AutoLoader::loadFiles( $extInfo['autoloaderPaths'] );
-		AutoLoader::registerClasses( $extInfo['autoloaderClasses'] );
-		AutoLoader::registerNamespaces( $extInfo['autoloaderNS'] );
-
-		return new HookContainer(
-			new StaticHookRegistry(
-				[ 'LoadExtensionSchemaUpdates' => $legacySchemaHooks ],
-				$extInfo['attributes']['Hooks'] ?? [],
-				$extInfo['attributes']['DeprecatedHooks'] ?? []
-			),
-			MediaWikiServices::getInstance()->getObjectFactory()
-		);
+		// Web upgrade used to load extensions here, but it now injects a hook
+		// container like install
+		throw new LogicException( __METHOD__ .
+			' an extension hook container needs to be injected' );
 	}
 
 	/**
@@ -506,7 +466,6 @@ abstract class DatabaseUpdater {
 		$this->updatesSkipped = [];
 
 		foreach ( $updates as [ $func, $args, $origParams ] ) {
-			// @phan-suppress-next-line PhanUndeclaredInvokeInCallable
 			$func( ...$args );
 			flush();
 			$this->updatesSkipped[] = $origParams;
@@ -571,17 +530,17 @@ abstract class DatabaseUpdater {
 	 * @param bool $hasVirtualDomain Whether the updates' array include virtual domains
 	 */
 	private function runUpdates( array $updates, $passSelf, $hasVirtualDomain = false ) {
-		$lbFactory = MediaWikiServices::getInstance()->getDBLoadBalancerFactory();
+		$lbFactory = $this->getLBFactory();
 		$updatesDone = [];
 		$updatesSkipped = [];
 		foreach ( $updates as $params ) {
 			$origParams = $params;
 			$oldDb = null;
-			$virtualDomain = null;
+			$this->currentVirtualDomain = null;
 			if ( $hasVirtualDomain === true ) {
-				$virtualDomain = array_shift( $params );
+				$this->currentVirtualDomain = array_shift( $params );
 				$oldDb = $this->db;
-				$virtualDb = $lbFactory->getPrimaryDatabase( $virtualDomain );
+				$virtualDb = $lbFactory->getPrimaryDatabase( $this->currentVirtualDomain );
 				'@phan-var IMaintainableDatabase $virtualDb';
 				$this->maintenance->setDB( $virtualDb );
 				$this->db = $virtualDb;
@@ -596,6 +555,7 @@ abstract class DatabaseUpdater {
 			if ( $hasVirtualDomain === true && $oldDb ) {
 				$this->db = $oldDb;
 				$this->maintenance->setDB( $oldDb );
+				$this->currentVirtualDomain = null;
 			}
 
 			flush();
@@ -612,6 +572,10 @@ abstract class DatabaseUpdater {
 		}
 		$this->updatesSkipped = array_merge( $this->updatesSkipped, $updatesSkipped );
 		$this->updates = array_merge( $this->updates, $updatesDone );
+	}
+
+	private function getLBFactory(): LBFactory {
+		return MediaWikiServices::getInstance()->getDBLoadBalancerFactory();
 	}
 
 	/**
@@ -693,13 +657,17 @@ abstract class DatabaseUpdater {
 	protected function doTable( $name ) {
 		global $wgSharedDB, $wgSharedTables;
 
-		// Don't bother to check $wgSharedTables if there isn't a shared database
-		// or the user actually also wants to do updates on the shared database.
-		if ( $wgSharedDB === null || $this->shared ) {
+		if ( $this->shared ) {
+			// Shared updates are enabled
 			return true;
 		}
-
-		if ( in_array( $name, $wgSharedTables ) ) {
+		if ( $this->currentVirtualDomain
+			&& $this->getLBFactory()->isSharedVirtualDomain( $this->currentVirtualDomain )
+		) {
+			$this->output( "...skipping update to table $name in shared virtual domain.\n" );
+			return false;
+		}
+		if ( $wgSharedDB !== null && in_array( $name, $wgSharedTables ) ) {
 			$this->output( "...skipping update to shared table $name.\n" );
 			return false;
 		}
@@ -802,22 +770,23 @@ abstract class DatabaseUpdater {
 	}
 
 	/**
-	 * Get the full path of a patch file. Keep in mind this always returns a patch, as
-	 * it fails back to MySQL if no DB-specific patch can be found
+	 * Get the full path to a patch file.
 	 *
 	 * @param IDatabase $db
-	 * @param string $patch The name of the patch, like patch-something.sql
-	 * @return string Full path to patch file
+	 * @param string $patch The basename of the patch, like patch-something.sql
+	 * @return string Full path to patch file. It fails back to MySQL
+	 *  if no DB-specific patch exists.
 	 */
 	public function patchPath( IDatabase $db, $patch ) {
-		$baseDir = MediaWikiServices::getInstance()->getMainConfig()->get( MainConfigNames::BaseDirectory );
+		$baseDir = MW_INSTALL_PATH;
 
 		$dbType = $db->getType();
-		if ( file_exists( "$baseDir/maintenance/$dbType/archives/$patch" ) ) {
-			return "$baseDir/maintenance/$dbType/archives/$patch";
+		if ( file_exists( "$baseDir/sql/$dbType/$patch" ) ) {
+			return "$baseDir/sql/$dbType/$patch";
 		}
 
-		return "$baseDir/maintenance/archives/$patch";
+		// TODO: Is the fallback still needed after the changes from T382030?
+		return "$baseDir/sql/mysql/$patch";
 	}
 
 	/**
@@ -1301,14 +1270,6 @@ abstract class DatabaseUpdater {
 		MessageBlobStore::clearGlobalCacheEntry(
 			$services->getMainWANObjectCache()
 		);
-
-		// ResourceLoader: File-dependency cache
-		$this->db->newDeleteQueryBuilder()
-			->deleteFrom( 'module_deps' )
-			->where( ISQLPlatform::ALL_ROWS )
-			->caller( __METHOD__ )
-			->execute();
-		$this->output( "done.\n" );
 	}
 
 	/**

@@ -106,19 +106,28 @@ class SiteStatsUpdate implements DeferrableUpdate, MergeableUpdate {
 
 	public function doUpdate() {
 		$services = MediaWikiServices::getInstance();
-		$metric = $services->getStatsFactory()->getCounter( 'site_stats_total' );
-		$shards = $services->getMainConfig()->get( MainConfigNames::MultiShardSiteStats ) ?
-			self::SHARDS_ON : self::SHARDS_OFF;
+		$stats = $services->getStatsFactory();
+		$shards = $services->getMainConfig()->get( MainConfigNames::MultiShardSiteStats )
+			? self::SHARDS_ON
+			: self::SHARDS_OFF;
 
 		$deltaByType = [];
 		foreach ( self::COUNTERS as $type ) {
 			$delta = $this->$type;
-			if ( $delta !== 0 ) {
-				$metric->setLabel( 'engagement', $type )
+			$deltaByType[$type] = $delta;
+
+			// T392258: This is an operational metric for site activity and server load,
+			// e.g. edit submissions and account creations.
+			// When MediaWiki adjusts the "total" downward, e.g. after a re-count or
+			// page deletion, we should ignore that. We have to anyway, as Prometheus
+			// requires counters to monotonically increase.
+			// https://prometheus.io/docs/concepts/metric_types/#counter
+			if ( $delta > 0 ) {
+				$stats->getCounter( 'site_stats_total' )
+					->setLabel( 'engagement', $type )
 					->copyToStatsdAt( "site.$type" )
 					->incrementBy( $delta );
 			}
-			$deltaByType[$type] = $delta;
 		}
 
 		( new AutoCommitUpdate(
@@ -138,16 +147,13 @@ class SiteStatsUpdate implements DeferrableUpdate, MergeableUpdate {
 					$delta = (int)$deltaByType[$type];
 					$initValues[$field] = $delta;
 					if ( $delta > 0 ) {
-						$set[$field] = new RawSQLValue( $dbw->buildGreatest(
-							[ $field => $dbw->addIdentifierQuotes( $field ) . '+' . abs( $delta ) ],
-							0
-						) );
+						$set[$field] = new RawSQLValue( $dbw->addIdentifierQuotes( $field ) . '+' . abs( $delta ) );
 					} elseif ( $delta < 0 ) {
 						$hasNegativeDelta = true;
 						$set[$field] = new RawSQLValue( $dbw->buildGreatest(
-							[ 'new' => $dbw->addIdentifierQuotes( $field ) . '-' . abs( $delta ) ],
-							0
-						) );
+							[ 'new' => $dbw->addIdentifierQuotes( $field ) ],
+							abs( $delta )
+						) . '-' . abs( $delta ) );
 					}
 				}
 

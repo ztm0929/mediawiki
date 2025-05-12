@@ -25,7 +25,6 @@ return [
 			'ExtensionAssetsPath' => false,
 			'ExtensionDirectory' => null,
 			'StyleDirectory' => null,
-			'BaseDirectory' => null,
 			'ArticlePath' => false,
 			'UploadPath' => false,
 			'ImgAuthPath' => false,
@@ -303,6 +302,8 @@ return [
 			'ThumbnailNamespaces' => [
 				6,
 			],
+			'ThumbnailSteps' => null,
+			'ThumbnailStepsRatio' => null,
 			'ThumbnailBuckets' => null,
 			'ThumbnailMinimumBucketDistance' => 50,
 			'UploadThumbnailRenderMap' => [
@@ -392,6 +393,8 @@ return [
 			'VirtualDomainsMapping' => [
 			],
 			'PageLinksSchemaMigrationStage' => 768,
+			'FileSchemaMigrationStage' => 3,
+			'CategoryLinksSchemaMigrationStage' => 3,
 			'ExternalLinksDomainGaps' => [
 			],
 			'ContentHandlers' => [
@@ -520,7 +523,8 @@ return [
 			],
 			'ChronologyProtectorSecret' => '',
 			'ParserCacheExpireTime' => 86400,
-			'ParserCacheNewKeySchemaRatio' => 0,
+			'ParserCacheAsyncExpireTime' => 60,
+			'ParserCacheAsyncRefreshJobs' => true,
 			'OldRevisionParserCacheExpireTime' => 3600,
 			'ObjectCacheSessionExpiry' => 3600,
 			'PHPSessionHandling' => 'enable',
@@ -611,7 +615,6 @@ return [
 			'RawHtmlMessages' => [
 				'copyright',
 				'history_copyright',
-				'googlesearch',
 			],
 			'AllowRawHtmlCopyrightMessages' => true,
 			'Localtimezone' => null,
@@ -647,6 +650,7 @@ return [
 						'src' => null,
 						'url' => 'https://www.mediawiki.org/',
 						'alt' => 'Powered by MediaWiki',
+						'lang' => 'en',
 					],
 				],
 			],
@@ -793,8 +797,9 @@ return [
 			'ParsoidSettings' => [
 				'useSelser' => true,
 			],
+			'ParsoidExperimentalParserFunctionOutput' => false,
 			'ParserEnableLegacyMediaDOM' => false,
-			'ParserEnableLegacyHeadingDOM' => true,
+			'ParserEnableLegacyHeadingDOM' => false,
 			'UseContentMediaStyles' => false,
 			'UseLegacyMediaStyles' => false,
 			'RawHtml' => false,
@@ -842,6 +847,7 @@ return [
 					'class' => 'MediaWiki\\User\\Registration\\LocalUserRegistrationProvider',
 					'services' => [
 						'UserFactory',
+						'ConnectionProvider',
 					],
 				],
 			],
@@ -1156,10 +1162,12 @@ return [
 					'useYear' => true,
 				],
 				'serialMapping' => [
-					'type' => 'plain-numeric',
+					'type' => 'readable-numeric',
 				],
 				'expireAfterDays' => 90,
 				'notifyBeforeExpirationDays' => 10,
+			],
+			'AutoblockExemptions' => [
 			],
 			'AutoblockExpiry' => 86400,
 			'BlockAllowsUTEdit' => true,
@@ -1385,7 +1393,6 @@ return [
 			],
 			'EnableDnsBlacklist' => false,
 			'DnsBlacklistUrls' => [
-				'http.dnsbl.sorbs.net.',
 			],
 			'ProxyList' => [
 			],
@@ -1961,6 +1968,14 @@ return [
 				'https://(?:[a-z0-9_]+@)?gerrit.wikimedia.org/r/(?:p/)?(.*)' => 'https://gerrit.wikimedia.org/g/%R/+/%H',
 				'ssh://(?:[a-z0-9_]+@)?gerrit.wikimedia.org:29418/(.*)' => 'https://gerrit.wikimedia.org/g/%R/+/%H',
 			],
+			'InstallerInitialPages' => [
+				[
+					'titlemsg' => 'mainpage',
+					'text' => '{{subst:int:mainpagetext}}
+
+{{subst:int:mainpagedocfooter}}',
+				],
+			],
 			'RCMaxAge' => 7776000,
 			'WatchersMaxAge' => 15552000,
 			'UnwatchedPageSecret' => 1,
@@ -2015,6 +2030,7 @@ return [
 				'mw-changed-redirect-target' => true,
 				'mw-blank' => true,
 				'mw-replace' => true,
+				'mw-recreated' => true,
 				'mw-rollback' => true,
 				'mw-undo' => true,
 				'mw-manual-revert' => true,
@@ -2095,10 +2111,10 @@ return [
 			'ServiceWiringFiles' => [
 			],
 			'JobClasses' => [
-				'deletePage' => 'DeletePageJob',
-				'refreshLinks' => 'RefreshLinksJob',
-				'deleteLinks' => 'DeleteLinksJob',
-				'htmlCacheUpdate' => 'HTMLCacheUpdateJob',
+				'deletePage' => 'MediaWiki\\JobQueue\\Jobs\\DeletePageJob',
+				'refreshLinks' => 'MediaWiki\\JobQueue\\Jobs\\RefreshLinksJob',
+				'deleteLinks' => 'MediaWiki\\JobQueue\\Jobs\\DeleteLinksJob',
+				'htmlCacheUpdate' => 'MediaWiki\\JobQueue\\Jobs\\HTMLCacheUpdateJob',
 				'sendMail' => [
 					'class' => 'EmaillingJob',
 					'services' => [
@@ -2107,7 +2123,7 @@ return [
 				],
 				'enotifNotify' => 'EnotifNotifyJob',
 				'fixDoubleRedirect' => [
-					'class' => 'DoubleRedirectJob',
+					'class' => 'MediaWiki\\JobQueue\\Jobs\\DoubleRedirectJob',
 					'services' => [
 						'RevisionLookup',
 						'MagicWordFactory',
@@ -2115,26 +2131,26 @@ return [
 					],
 					'needsPage' => true,
 				],
-				'AssembleUploadChunks' => 'AssembleUploadChunksJob',
-				'PublishStashedFile' => 'PublishStashedFileJob',
-				'ThumbnailRender' => 'ThumbnailRenderJob',
-				'UploadFromUrl' => 'UploadFromUrlJob',
-				'recentChangesUpdate' => 'RecentChangesUpdateJob',
-				'refreshLinksPrioritized' => 'RefreshLinksJob',
-				'refreshLinksDynamic' => 'RefreshLinksJob',
+				'AssembleUploadChunks' => 'MediaWiki\\JobQueue\\Jobs\\AssembleUploadChunksJob',
+				'PublishStashedFile' => 'MediaWiki\\JobQueue\\Jobs\\PublishStashedFileJob',
+				'ThumbnailRender' => 'MediaWiki\\JobQueue\\Jobs\\ThumbnailRenderJob',
+				'UploadFromUrl' => 'MediaWiki\\JobQueue\\Jobs\\UploadFromUrlJob',
+				'recentChangesUpdate' => 'MediaWiki\\RecentChanges\\RecentChangesUpdateJob',
+				'refreshLinksPrioritized' => 'MediaWiki\\JobQueue\\Jobs\\RefreshLinksJob',
+				'refreshLinksDynamic' => 'MediaWiki\\JobQueue\\Jobs\\RefreshLinksJob',
 				'activityUpdateJob' => 'MediaWiki\\Watchlist\\ActivityUpdateJob',
-				'categoryMembershipChange' => 'CategoryMembershipChangeJob',
+				'categoryMembershipChange' => 'MediaWiki\\JobQueue\\Jobs\\CategoryMembershipChangeJob',
 				'clearUserWatchlist' => 'MediaWiki\\Watchlist\\ClearUserWatchlistJob',
 				'watchlistExpiry' => 'MediaWiki\\Watchlist\\WatchlistExpiryJob',
-				'cdnPurge' => 'CdnPurgeJob',
+				'cdnPurge' => 'MediaWiki\\JobQueue\\Jobs\\CdnPurgeJob',
 				'userGroupExpiry' => 'UserGroupExpiryJob',
 				'clearWatchlistNotifications' => 'MediaWiki\\Watchlist\\ClearWatchlistNotificationsJob',
 				'userOptionsUpdate' => 'UserOptionsUpdateJob',
-				'revertedTagUpdate' => 'RevertedTagUpdateJob',
-				'null' => 'NullJob',
+				'revertedTagUpdate' => 'MediaWiki\\JobQueue\\Jobs\\RevertedTagUpdateJob',
+				'null' => 'MediaWiki\\JobQueue\\Jobs\\NullJob',
 				'userEditCountInit' => 'UserEditCountInitJob',
 				'parsoidCachePrewarm' => [
-					'class' => 'ParsoidCachePrewarmJob',
+					'class' => 'MediaWiki\\JobQueue\\Jobs\\ParsoidCachePrewarmJob',
 					'services' => [
 						'ParserOutputAccess',
 						'PageStore',
@@ -2143,8 +2159,22 @@ return [
 					],
 					'needsPage' => false,
 				],
+				'renameUserTable' => [
+					'class' => 'MediaWiki\\RenameUser\\Job\\RenameUserTableJob',
+					'services' => [
+						'MainConfig',
+						'DBLoadBalancerFactory',
+					],
+				],
+				'renameUserDerived' => [
+					'class' => 'MediaWiki\\RenameUser\\Job\\RenameUserDerivedJob',
+					'services' => [
+						'RenameUserFactory',
+						'UserFactory',
+					],
+				],
 				'renameUser' => [
-					'class' => 'MediaWiki\\RenameUser\\RenameUserJob',
+					'class' => 'MediaWiki\\RenameUser\\Job\\RenameUserTableJob',
 					'services' => [
 						'MainConfig',
 						'DBLoadBalancerFactory',
@@ -2160,7 +2190,7 @@ return [
 			],
 			'JobTypeConf' => [
 				'default' => [
-					'class' => 'JobQueueDB',
+					'class' => 'MediaWiki\\JobQueue\\JobQueueDB',
 					'order' => 'random',
 					'claimTTL' => 3600,
 				],
@@ -2192,6 +2222,7 @@ return [
 				'upload',
 				'move',
 				'import',
+				'interwiki',
 				'patrol',
 				'merge',
 				'suppress',
@@ -2237,44 +2268,117 @@ return [
 			'LogActions' => [
 			],
 			'LogActionsHandlers' => [
-				'block/block' => 'BlockLogFormatter',
-				'block/reblock' => 'BlockLogFormatter',
-				'block/unblock' => 'BlockLogFormatter',
-				'contentmodel/change' => 'ContentModelLogFormatter',
-				'contentmodel/new' => 'ContentModelLogFormatter',
-				'delete/delete' => 'DeleteLogFormatter',
-				'delete/delete_redir' => 'DeleteLogFormatter',
-				'delete/delete_redir2' => 'DeleteLogFormatter',
-				'delete/event' => 'DeleteLogFormatter',
-				'delete/restore' => 'DeleteLogFormatter',
-				'delete/revision' => 'DeleteLogFormatter',
-				'import/interwiki' => 'ImportLogFormatter',
-				'import/upload' => 'ImportLogFormatter',
-				'managetags/activate' => 'LogFormatter',
-				'managetags/create' => 'LogFormatter',
-				'managetags/deactivate' => 'LogFormatter',
-				'managetags/delete' => 'LogFormatter',
-				'merge/merge' => 'MergeLogFormatter',
-				'move/move' => 'MoveLogFormatter',
-				'move/move_redir' => 'MoveLogFormatter',
-				'patrol/patrol' => 'PatrolLogFormatter',
-				'patrol/autopatrol' => 'PatrolLogFormatter',
-				'protect/modify' => 'ProtectLogFormatter',
-				'protect/move_prot' => 'ProtectLogFormatter',
-				'protect/protect' => 'ProtectLogFormatter',
-				'protect/unprotect' => 'ProtectLogFormatter',
-				'renameuser/renameuser' => 'RenameuserLogFormatter',
-				'rights/autopromote' => 'RightsLogFormatter',
-				'rights/rights' => 'RightsLogFormatter',
-				'suppress/block' => 'BlockLogFormatter',
-				'suppress/delete' => 'DeleteLogFormatter',
-				'suppress/event' => 'DeleteLogFormatter',
-				'suppress/reblock' => 'BlockLogFormatter',
-				'suppress/revision' => 'DeleteLogFormatter',
-				'tag/update' => 'TagLogFormatter',
-				'upload/overwrite' => 'UploadLogFormatter',
-				'upload/revert' => 'UploadLogFormatter',
-				'upload/upload' => 'UploadLogFormatter',
+				'block/block' => [
+					'class' => 'MediaWiki\\Logging\\BlockLogFormatter',
+					'services' => [
+						'TitleParser',
+						'NamespaceInfo',
+					],
+				],
+				'block/reblock' => [
+					'class' => 'MediaWiki\\Logging\\BlockLogFormatter',
+					'services' => [
+						'TitleParser',
+						'NamespaceInfo',
+					],
+				],
+				'block/unblock' => [
+					'class' => 'MediaWiki\\Logging\\BlockLogFormatter',
+					'services' => [
+						'TitleParser',
+						'NamespaceInfo',
+					],
+				],
+				'contentmodel/change' => 'MediaWiki\\Logging\\ContentModelLogFormatter',
+				'contentmodel/new' => 'MediaWiki\\Logging\\ContentModelLogFormatter',
+				'delete/delete' => 'MediaWiki\\Logging\\DeleteLogFormatter',
+				'delete/delete_redir' => 'MediaWiki\\Logging\\DeleteLogFormatter',
+				'delete/delete_redir2' => 'MediaWiki\\Logging\\DeleteLogFormatter',
+				'delete/event' => 'MediaWiki\\Logging\\DeleteLogFormatter',
+				'delete/restore' => 'MediaWiki\\Logging\\DeleteLogFormatter',
+				'delete/revision' => 'MediaWiki\\Logging\\DeleteLogFormatter',
+				'import/interwiki' => 'MediaWiki\\Logging\\ImportLogFormatter',
+				'import/upload' => 'MediaWiki\\Logging\\ImportLogFormatter',
+				'interwiki/iw_add' => 'MediaWiki\\Logging\\InterwikiLogFormatter',
+				'interwiki/iw_delete' => 'MediaWiki\\Logging\\InterwikiLogFormatter',
+				'interwiki/iw_edit' => 'MediaWiki\\Logging\\InterwikiLogFormatter',
+				'managetags/activate' => 'MediaWiki\\Logging\\LogFormatter',
+				'managetags/create' => 'MediaWiki\\Logging\\LogFormatter',
+				'managetags/deactivate' => 'MediaWiki\\Logging\\LogFormatter',
+				'managetags/delete' => 'MediaWiki\\Logging\\LogFormatter',
+				'merge/merge' => [
+					'class' => 'MediaWiki\\Logging\\MergeLogFormatter',
+					'services' => [
+						'TitleParser',
+					],
+				],
+				'move/move' => [
+					'class' => 'MediaWiki\\Logging\\MoveLogFormatter',
+					'services' => [
+						'TitleParser',
+					],
+				],
+				'move/move_redir' => [
+					'class' => 'MediaWiki\\Logging\\MoveLogFormatter',
+					'services' => [
+						'TitleParser',
+					],
+				],
+				'patrol/patrol' => 'MediaWiki\\Logging\\PatrolLogFormatter',
+				'patrol/autopatrol' => 'MediaWiki\\Logging\\PatrolLogFormatter',
+				'protect/modify' => [
+					'class' => 'MediaWiki\\Logging\\ProtectLogFormatter',
+					'services' => [
+						'TitleParser',
+					],
+				],
+				'protect/move_prot' => [
+					'class' => 'MediaWiki\\Logging\\ProtectLogFormatter',
+					'services' => [
+						'TitleParser',
+					],
+				],
+				'protect/protect' => [
+					'class' => 'MediaWiki\\Logging\\ProtectLogFormatter',
+					'services' => [
+						'TitleParser',
+					],
+				],
+				'protect/unprotect' => [
+					'class' => 'MediaWiki\\Logging\\ProtectLogFormatter',
+					'services' => [
+						'TitleParser',
+					],
+				],
+				'renameuser/renameuser' => [
+					'class' => 'MediaWiki\\Logging\\RenameuserLogFormatter',
+					'services' => [
+						'TitleParser',
+					],
+				],
+				'rights/autopromote' => 'MediaWiki\\Logging\\RightsLogFormatter',
+				'rights/rights' => 'MediaWiki\\Logging\\RightsLogFormatter',
+				'suppress/block' => [
+					'class' => 'MediaWiki\\Logging\\BlockLogFormatter',
+					'services' => [
+						'TitleParser',
+						'NamespaceInfo',
+					],
+				],
+				'suppress/delete' => 'MediaWiki\\Logging\\DeleteLogFormatter',
+				'suppress/event' => 'MediaWiki\\Logging\\DeleteLogFormatter',
+				'suppress/reblock' => [
+					'class' => 'MediaWiki\\Logging\\BlockLogFormatter',
+					'services' => [
+						'TitleParser',
+						'NamespaceInfo',
+					],
+				],
+				'suppress/revision' => 'MediaWiki\\Logging\\DeleteLogFormatter',
+				'tag/update' => 'MediaWiki\\Logging\\TagLogFormatter',
+				'upload/overwrite' => 'MediaWiki\\Logging\\UploadLogFormatter',
+				'upload/revert' => 'MediaWiki\\Logging\\UploadLogFormatter',
+				'upload/upload' => 'MediaWiki\\Logging\\UploadLogFormatter',
 			],
 			'ActionFilteredLogs' => [
 				'block' => [
@@ -2536,6 +2640,8 @@ return [
 			'EnableProtectionIndicators' => false,
 			'OutputPipelineStages' => [
 			],
+			'FeatureShutdown' => [
+			],
 		],
 		'type' => [
 			'ConfigRegistry' => 'object',
@@ -2547,6 +2653,11 @@ return [
 			],
 			'StyleDirectory' => [
 				'string',
+				'null',
+			],
+			'UploadDirectory' => [
+				'string',
+				'boolean',
 				'null',
 			],
 			'Logos' => [
@@ -2634,6 +2745,14 @@ return [
 			'ImageLimits' => 'array',
 			'ThumbLimits' => 'array',
 			'ThumbnailNamespaces' => 'array',
+			'ThumbnailSteps' => [
+				'array',
+				'null',
+			],
+			'ThumbnailStepsRatio' => [
+				'number',
+				'null',
+			],
 			'ThumbnailBuckets' => [
 				'array',
 				'null',
@@ -2676,6 +2795,8 @@ return [
 			'LocalDatabases' => 'array',
 			'VirtualDomainsMapping' => 'object',
 			'PageLinksSchemaMigrationStage' => 'integer',
+			'FileSchemaMigrationStage' => 'integer',
+			'CategoryLinksSchemaMigrationStage' => 'integer',
 			'ExternalLinksDomainGaps' => 'object',
 			'ContentHandlers' => 'object',
 			'NamespaceContentModels' => 'object',
@@ -2727,7 +2848,6 @@ return [
 			'ParsoidSelectiveUpdateSampleRate' => 'integer',
 			'ParserCacheFilterConfig' => 'object',
 			'ChronologyProtectorSecret' => 'string',
-			'ParserCacheNewKeySchemaRatio' => 'integer',
 			'PHPSessionHandling' => 'string',
 			'SuspiciousIpExpiry' => [
 				'integer',
@@ -2787,6 +2907,7 @@ return [
 			'UrlProtocols' => 'array',
 			'TidyConfig' => 'object',
 			'ParsoidSettings' => 'object',
+			'ParsoidExperimentalParserFunctionOutput' => 'boolean',
 			'NoFollowNsExceptions' => 'array',
 			'NoFollowDomainExceptions' => 'array',
 			'EnableMagicLinks' => 'object',
@@ -2819,6 +2940,7 @@ return [
 			],
 			'SessionProviders' => 'object',
 			'AutoCreateTempUser' => 'object',
+			'AutoblockExemptions' => 'array',
 			'BlockCIDRLimit' => 'object',
 			'EnablePartialActionBlocks' => 'boolean',
 			'EnableMultiBlocks' => 'boolean',
@@ -2922,6 +3044,7 @@ return [
 			'PreviewOnOpenNamespaces' => 'object',
 			'ReadOnlyWatchedItemStore' => 'boolean',
 			'GitRepositoryViewers' => 'object',
+			'InstallerInitialPages' => 'array',
 			'RCLinkLimits' => 'array',
 			'RCLinkDays' => 'array',
 			'RCFeeds' => 'object',
@@ -3021,6 +3144,7 @@ return [
 			'ShowLogoutConfirmation' => 'boolean',
 			'EnableProtectionIndicators' => 'boolean',
 			'OutputPipelineStages' => 'object',
+			'FeatureShutdown' => 'array',
 		],
 		'mergeStrategy' => [
 			'TiffThumbnailType' => 'replace',
@@ -3030,6 +3154,8 @@ return [
 			'AuthManagerAutoConfig' => 'array_plus_2d',
 			'GroupPermissions' => 'array_plus_2d',
 			'RevokePermissions' => 'array_plus_2d',
+			'AddGroups' => 'array_merge_recursive',
+			'RemoveGroups' => 'array_merge_recursive',
 			'RateLimits' => 'array_plus_2d',
 			'GrantPermissions' => 'array_plus_2d',
 			'MWLoggerDefaultSpi' => 'replace',
@@ -3115,15 +3241,6 @@ return [
 				'callback' => [
 					'MediaWiki\\MainConfigSchema',
 					'getDefaultUploadPath',
-				],
-			],
-			'UploadDirectory' => [
-				'use' => [
-					'BaseDirectory',
-				],
-				'callback' => [
-					'MediaWiki\\MainConfigSchema',
-					'getDefaultUploadDirectory',
 				],
 			],
 			'FileCacheDirectory' => [
@@ -3317,6 +3434,9 @@ return [
 		],
 		'ParserEnableLegacyMediaDOM' => [
 			'deprecated' => 'since 1.41',
+		],
+		'ParserEnableLegacyHeadingDOM' => [
+			'deprecated' => 'since 1.44',
 		],
 		'UseContentMediaStyles' => [
 			'deprecated' => 'since 1.41',

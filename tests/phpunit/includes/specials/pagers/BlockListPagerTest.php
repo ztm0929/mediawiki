@@ -2,8 +2,7 @@
 
 use MediaWiki\Block\BlockActionInfo;
 use MediaWiki\Block\BlockRestrictionStore;
-use MediaWiki\Block\BlockUtils;
-use MediaWiki\Block\DatabaseBlock;
+use MediaWiki\Block\BlockTargetFactory;
 use MediaWiki\Block\HideUserUtils;
 use MediaWiki\Block\Restriction\NamespaceRestriction;
 use MediaWiki\Block\Restriction\PageRestriction;
@@ -14,6 +13,7 @@ use MediaWiki\Context\RequestContext;
 use MediaWiki\Linker\LinkRenderer;
 use MediaWiki\MainConfigNames;
 use MediaWiki\Pager\BlockListPager;
+use MediaWiki\Permissions\UltimateAuthority;
 use MediaWiki\Request\FauxRequest;
 use MediaWiki\SpecialPage\SpecialPageFactory;
 use MediaWiki\Utils\MWTimestamp;
@@ -33,8 +33,8 @@ class BlockListPagerTest extends MediaWikiIntegrationTestCase {
 	/** @var BlockRestrictionStore */
 	private $blockRestrictionStore;
 
-	/** @var BlockUtils */
-	private $blockUtils;
+	/** @var BlockTargetFactory */
+	private $blockTargetFactory;
 
 	/** @var HideUserUtils */
 	private $hideUserUtils;
@@ -63,7 +63,7 @@ class BlockListPagerTest extends MediaWikiIntegrationTestCase {
 		$services = $this->getServiceContainer();
 		$this->blockActionInfo = $services->getBlockActionInfo();
 		$this->blockRestrictionStore = $services->getBlockRestrictionStore();
-		$this->blockUtils = $services->getBlockUtils();
+		$this->blockTargetFactory = $services->getBlockTargetFactory();
 		$this->hideUserUtils = $services->getHideUserUtils();
 		$this->commentStore = $services->getCommentStore();
 		$this->linkBatchFactory = $services->getLinkBatchFactory();
@@ -78,7 +78,7 @@ class BlockListPagerTest extends MediaWikiIntegrationTestCase {
 			RequestContext::getMain(),
 			$this->blockActionInfo,
 			$this->blockRestrictionStore,
-			$this->blockUtils,
+			$this->blockTargetFactory,
 			$this->hideUserUtils,
 			$this->commentStore,
 			$this->linkBatchFactory,
@@ -174,7 +174,7 @@ class BlockListPagerTest extends MediaWikiIntegrationTestCase {
 				$row,
 			],
 			[
-				'by',
+				'bl_by',
 				'<a %s><bdi>Admin</bdi></a>%s',
 				$row,
 			],
@@ -313,18 +313,17 @@ class BlockListPagerTest extends MediaWikiIntegrationTestCase {
 		$target = '127.0.0.1';
 
 		// Test partial blocks.
-		$block = new DatabaseBlock( [
-			'address' => $target,
-			'by' => $this->getTestSysop()->getUser(),
-			'reason' => 'Parce que',
-			'expiry' => $this->getDb()->getInfinity(),
-			'sitewide' => false,
-		] );
-		$block->setRestrictions( [
-			new PageRestriction( 0, $page->getId() ),
-		] );
-		$blockStore = $this->getServiceContainer()->getDatabaseBlockStore();
-		$blockStore->insertBlock( $block );
+		$block = $this->getServiceContainer()->getDatabaseBlockStore()
+			->insertBlockWithParams( [
+				'address' => $target,
+				'by' => $this->getTestSysop()->getUser(),
+				'reason' => 'Parce que',
+				'expiry' => $this->getDb()->getInfinity(),
+				'sitewide' => false,
+				'restrictions' => [
+					new PageRestriction( 0, $page->getId() ),
+				]
+			] );
 
 		$pager = $this->getBlockListPager();
 		$result = $this->getDb()->newSelectQueryBuilder()
@@ -363,5 +362,33 @@ class BlockListPagerTest extends MediaWikiIntegrationTestCase {
 		$pager = $this->getBlockListPager();
 		$pager->getFullOutput();
 		$this->assertTrue( true );
+	}
+
+	/**
+	 * T385765 regression test
+	 * @coversNothing
+	 */
+	public function testAutoblockLeak() {
+		$sysop = $this->getTestSysop()->getUserIdentity();
+		$this->overrideConfigValue( MainConfigNames::UseCodexSpecialBlock, true );
+		// Enable block links
+		RequestContext::getMain()->setAuthority( new UltimateAuthority( $sysop ) );
+		// Don't localise
+		RequestContext::getMain()->setLanguage( 'qqx' );
+		// Create autoblock
+		$addr = '127.0.0.1';
+		$this->getServiceContainer()->getDatabaseBlockStore()
+			->insertBlockWithParams( [
+				'address' => $addr,
+				'auto' => true,
+				'by' => $sysop
+			] );
+		// Run the pager over all blocks (there should only be one)
+		$pager = $this->getBlockListPager();
+		$body = $pager->getBody();
+		// Check that we managed to generate a remove link
+		$this->assertStringContainsString( '(remove-blocklink)', $body );
+		// Check that we didn't leak the IP address into it
+		$this->assertStringNotContainsString( $addr, $body );
 	}
 }

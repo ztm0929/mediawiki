@@ -228,7 +228,7 @@
 	"prefs-displaywatchlist": "Opciones de visualización",
 	"prefs-watchlist-days": "Número de días que mostrar en la lista de seguimiento:",
 	"prefs-watchlist-days-max": "Máximo $1 {{PLURAL:$1|día|días}}",
-	"prefs-watchlist-edits": "Número máximo de ediciones a mostrar en la lista de seguimiento:",
+	"prefs-watchlist-edits": "Número máximo de ediciones que mostrar en la lista de seguimiento:",
 	"prefs-watchlist-edits-max": "Cantidad máxima: 1000",
 	"prefs-advancedwatchlist": "Opciones avanzadas",
 	"tog-extendwatchlist": "Mostrar todos los cambios en la lista de seguimiento, no solo los más recientes",
@@ -263,6 +263,7 @@
 	"search-thumbnail-extra-namespaces-label": "Mostrar miniaturas en Especial:Buscar en el Escritorio",
 	"search-thumbnail-extra-namespaces-message": "Muestra miniaturas para {{PLURAL:$2|el siguiente espacio|los siguientes espacios}} de nombres: $1 en la página {{#special:search}}",
 	"prefs-advancedsearchoptions": "Opciones avanzadas",
+	"prefs-misc": "Varias",
 	"prefs-reset-intro": "Puedes usar esta página para restaurar los valores predeterminados de tus preferencias.\nNo podrás deshacer esta acción.",
 	"prefs-reset-confirm": "Sí, quiero reiniciar mi configuraciones.",
 	"restoreprefs": "Restaurar la configuración predeterminada"

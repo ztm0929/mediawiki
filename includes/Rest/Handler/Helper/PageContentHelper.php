@@ -60,7 +60,7 @@ class PageContentHelper {
 	protected PageLookup $pageLookup;
 	private TitleFactory $titleFactory;
 	private IConnectionProvider $dbProvider;
-	private ChangeTagsStore $changeTagStore;
+	private ChangeTagsStore $changeTagsStore;
 
 	/** @var Authority|null */
 	protected $authority = null;
@@ -84,7 +84,7 @@ class PageContentHelper {
 		PageLookup $pageLookup,
 		TitleFactory $titleFactory,
 		IConnectionProvider $dbProvider,
-		ChangeTagsStore $changeTagStore
+		ChangeTagsStore $changeTagsStore
 	) {
 		$this->options = $options;
 		$this->revisionLookup = $revisionLookup;
@@ -92,7 +92,7 @@ class PageContentHelper {
 		$this->pageLookup = $pageLookup;
 		$this->titleFactory = $titleFactory;
 		$this->dbProvider = $dbProvider;
-		$this->changeTagStore = $changeTagStore;
+		$this->changeTagsStore = $changeTagsStore;
 	}
 
 	/**
@@ -111,9 +111,6 @@ class PageContentHelper {
 		return $this->parameters['title'] ?? null;
 	}
 
-	/**
-	 * @return ExistingPageRecord|null
-	 */
 	public function getPage(): ?ExistingPageRecord {
 		if ( $this->pageRecord === false ) {
 			$titleText = $this->getTitleText();
@@ -202,9 +199,6 @@ class PageContentHelper {
 		return $content;
 	}
 
-	/**
-	 * @return bool
-	 */
 	public function isAccessible(): bool {
 		$page = $this->getPageIdentity();
 		return $page && $this->authority->probablyCan( 'read', $page );
@@ -227,9 +221,6 @@ class PageContentHelper {
 		return '"' . sha1( $revisionTag ) . '"';
 	}
 
-	/**
-	 * @return string|null
-	 */
 	public function getLastModified(): ?string {
 		if ( !$this->isAccessible() ) {
 			return null;
@@ -244,16 +235,11 @@ class PageContentHelper {
 
 	/**
 	 * Checks whether content exists. Permission checks are not considered.
-	 *
-	 * @return bool
 	 */
 	public function hasContent(): bool {
 		return $this->useDefaultSystemMessage() || (bool)$this->getPage();
 	}
 
-	/**
-	 * @return array
-	 */
 	public function constructMetadata(): array {
 		$revision = $this->getRevisionRecordForMetadata();
 
@@ -266,8 +252,7 @@ class PageContentHelper {
 				'id' => $revision->getId(),
 				'timestamp' => wfTimestampOrNull( TS_ISO_8601, $revision->getTimestamp() )
 			],
-			'content_model' => $revision->getSlot( SlotRecord::MAIN, RevisionRecord::RAW )
-				->getModel(),
+			'content_model' => $revision->getMainContentModel(),
 			'license' => [
 				'url' => $this->options->get( MainConfigNames::RightsUrl ),
 				'title' => $this->options->get( MainConfigNames::RightsText )
@@ -275,16 +260,13 @@ class PageContentHelper {
 		];
 	}
 
-	/**
-	 * @return array
-	 */
 	public function constructRestbaseCompatibleMetadata(): array {
 		$revision = $this->getRevisionRecordForMetadata();
 
 		$page = $revision->getPage();
 		$title = $this->titleFactory->newFromPageIdentity( $page );
 
-		$tags = $this->changeTagStore->getTags(
+		$tags = $this->changeTagsStore->getTags(
 			$this->dbProvider->getReplicaDatabase(),
 			null, $revision->getId(), null
 		);
@@ -299,6 +281,9 @@ class PageContentHelper {
 			$restrictions[] = 'userhidden';
 		}
 
+		$publicUser = $revision->getUser();
+		$publicComment = $revision->getComment();
+
 		return [
 			'title' => $title->getPrefixedDBkey(),
 			'page_id' => $page->getId(),
@@ -312,9 +297,9 @@ class PageContentHelper {
 
 			'namespace' => $page->getNamespace(),
 			'user_id' => $revision->getUser( RevisionRecord::RAW )->getId(),
-			'user_text' => $revision->getUser( RevisionRecord::FOR_PUBLIC )->getName(),
+			'user_text' => $publicUser ? $publicUser->getName() : null,
+			'comment' => $publicComment ? $publicComment->text : null,
 			'timestamp' => wfTimestampOrNull( TS_ISO_8601, $revision->getTimestamp() ),
-			'comment' => $revision->getComment()->text,
 			'tags' => $tags,
 			'restrictions' => $restrictions,
 			'page_language' => $title->getPageLanguage()->getCode(),
@@ -349,8 +334,6 @@ class PageContentHelper {
 	 *
 	 * Handlers that can follow wiki redirects can use this to give clients
 	 * control over the redirect handling behavior.
-	 *
-	 * @return bool
 	 */
 	public function getRedirectsAllowed(): bool {
 		return $this->parameters['redirect'] ?? true;
@@ -376,16 +359,11 @@ class PageContentHelper {
 	/**
 	 * If the page is a system message page. When the content gets
 	 * overridden to create an actual page, this method returns false.
-	 *
-	 * @return bool
 	 */
 	public function useDefaultSystemMessage(): bool {
 		return $this->getDefaultSystemMessage() !== null && $this->getPage() === null;
 	}
 
-	/**
-	 * @return Message|null
-	 */
 	public function getDefaultSystemMessage(): ?Message {
 		$title = Title::newFromText( $this->getTitleText() );
 

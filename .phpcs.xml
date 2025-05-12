@@ -1,7 +1,6 @@
 <?xml version="1.0"?>
 <ruleset name="MediaWiki">
 	<rule ref="./vendor/mediawiki/mediawiki-codesniffer/MediaWiki">
-		<exclude name="MediaWiki.Commenting.FunctionComment.MissingDocumentationPrivate" />
 		<exclude name="MediaWiki.Commenting.FunctionComment.MissingDocumentationProtected" />
 		<exclude name="MediaWiki.Commenting.FunctionComment.MissingDocumentationPublic" />
 		<exclude name="MediaWiki.Commenting.FunctionComment.WrongStyle" />
@@ -137,7 +136,7 @@
 	<file>.</file>
 	<arg name="encoding" value="UTF-8"/>
 	<arg name="extensions" value="php"/>
-	<exclude-pattern type="relative">^(extensions|skins)/*</exclude-pattern>
+	<exclude-pattern type="relative">^(extensions|skins|cache)/*</exclude-pattern>
 	<exclude-pattern type="relative">^docs/(coverage|html|js|latex)/*</exclude-pattern>
 	<exclude-pattern>LocalSettings(-installer)?\.php</exclude-pattern>
 </ruleset>

@@ -79,6 +79,7 @@ $specialPageAliases = [
 	'Filepath'                  => [ 'مسیر_پرونده' ],
 	'GoToInterwiki'             => [ 'برو_به_میان‌ویکی', 'میان‌ویکی' ],
 	'Import'                    => [ 'درون‌ریزی_صفحه' ],
+	'Interwiki'                 => [ 'میان‌ویکی' ],
 	'Invalidateemail'           => [ 'باطل‌کردن_ایمیل', 'باطل‌کردن_رایانامه' ],
 	'JavaScriptTest'            => [ 'تست_جاوااسکریپت' ],
 	'LinkAccounts'              => [ 'اتصال_حساب‌ها' ],
@@ -363,6 +364,8 @@ $separatorTransformTable = [
 	',' => '٬', # U+066C
 ];
 
+$numberingSystem = 'arabext';
+
 /**
  * A list of date format preference keys which can be selected in user
  * preferences. New preference keys can be added, provided they are supported
@@ -378,6 +381,7 @@ $datePreferences = [
 	'dmy',
 	'ymd',
 	'persian',
+	'hijri',
 	'hebrew',
 	'ISO 8601',
 ];
@@ -426,13 +430,30 @@ $dateFormats = [
 	'persian date' => 'xij xiF xiY',
 	'persian both' => 'xij xiF xiY، ساعت H:i',
 
+	'hijri time' => 'H:i',
+	'hijri date' => 'xmj xmF xmY',
+	'hijri both' => 'xmj xmF xmY، ساعت H:i',
+
 	'hebrew time' => 'H:i',
 	'hebrew date' => 'xij xjF xjY',
-	'hebrew both' => 'H:i, xij xjF xjY',
+	'hebrew both' => 'xij xjF xjY، ساعت H:i',
 
 	'ISO 8601 time' => 'xnH:xni:xns',
 	'ISO 8601 date' => 'xnY-xnm-xnd',
 	'ISO 8601 both' => 'xnY-xnm-xnd"T"xnH:xni:xns',
+];
+
+// Use Gregorian calendar, where appropriate, override fa browser locale
+$jsDateFormats = [
+	'mdy date' => [ 'options' => [ 'calendar' => 'gregory' ] ],
+	'mdy both' => [ 'options' => [ 'calendar' => 'gregory' ] ],
+	'mdy pretty' => [ 'options' => [ 'calendar' => 'gregory' ] ],
+	'dmy date' => [ 'options' => [ 'calendar' => 'gregory' ] ],
+	'dmy both' => [ 'options' => [ 'calendar' => 'gregory' ] ],
+	'dmy pretty' => [ 'options' => [ 'calendar' => 'gregory' ] ],
+	'ymd date' => [ 'options' => [ 'calendar' => 'gregory' ] ],
+	'ymd both' => [ 'options' => [ 'calendar' => 'gregory' ] ],
+	'ymd pretty' => [ 'options' => [ 'calendar' => 'gregory' ] ],
 ];
 
 # Harakat are intentionally not included in the linkTrail. Their addition should

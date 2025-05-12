@@ -74,7 +74,6 @@ class PHPSessionHandlerTest extends MediaWikiIntegrationTestCase {
 
 		session_write_close();
 		ini_set( 'session.use_cookies', 1 );
-		ini_set( 'session.use_trans_sid', 1 );
 
 		$store = new TestBagOStuff();
 		// Tolerate debug message, anything else is unexpected
@@ -91,7 +90,6 @@ class PHPSessionHandlerTest extends MediaWikiIntegrationTestCase {
 		$this->assertTrue( PHPSessionHandler::isInstalled() );
 
 		$this->assertFalse( wfIniGetBool( 'session.use_cookies' ) );
-		$this->assertFalse( wfIniGetBool( 'session.use_trans_sid' ) );
 
 		$this->assertNotNull( $staticAccess->instance );
 		$priv = TestingAccessWrapper::newFromObject( $staticAccess->instance );
@@ -105,9 +103,6 @@ class PHPSessionHandlerTest extends MediaWikiIntegrationTestCase {
 	 * @param string $handler php serialize_handler to use
 	 */
 	public function testSessionHandling( $handler ) {
-		// Tracked under T352913
-		$this->markTestSkippedIfPhp( '>=', '8.3' );
-
 		$this->hideDeprecated( '$_SESSION' );
 		$reset = $this->getResetter( $staticAccess );
 
@@ -163,6 +158,7 @@ class PHPSessionHandlerTest extends MediaWikiIntegrationTestCase {
 		$this->assertSame( [
 			[ LogLevel::DEBUG, 'SessionManager using store MediaWiki\Tests\Session\TestBagOStuff' ],
 			[ LogLevel::WARNING, 'Something wrote to $_SESSION!' ],
+			[ LogLevel::INFO, 'Session store: {action} for {reason}' ],
 		], $logger->getBuffer() );
 
 		// Screw up $_SESSION so we can tell the difference between "this

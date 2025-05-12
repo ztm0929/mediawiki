@@ -106,7 +106,6 @@ class PHPSessionHandler implements SessionHandlerInterface {
 
 	/**
 	 * Install a session handler for the current web request
-	 * @param SessionManager $manager
 	 */
 	public static function install( SessionManager $manager ) {
 		if ( self::$instance ) {
@@ -130,7 +129,6 @@ class PHPSessionHandler implements SessionHandlerInterface {
 
 			// Tell PHP not to mess with cookies itself
 			ini_set( 'session.use_cookies', 0 );
-			ini_set( 'session.use_trans_sid', 0 );
 
 			// T124510: Disable automatic PHP session related cache headers.
 			// MediaWiki adds its own headers and the default PHP behavior may

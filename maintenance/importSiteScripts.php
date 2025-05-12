@@ -23,6 +23,7 @@
 
 use MediaWiki\Content\ContentHandler;
 use MediaWiki\Json\FormatJson;
+use MediaWiki\Maintenance\Maintenance;
 use MediaWiki\StubObject\StubGlobalUser;
 use MediaWiki\Title\Title;
 use MediaWiki\User\User;
@@ -91,7 +92,7 @@ class ImportSiteScripts extends Maintenance {
 		}
 	}
 
-	protected function fetchScriptList() {
+	protected function fetchScriptList(): array {
 		$data = [
 			'action' => 'query',
 			'format' => 'json',

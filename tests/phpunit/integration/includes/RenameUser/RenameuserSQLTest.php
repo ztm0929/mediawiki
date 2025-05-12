@@ -2,6 +2,7 @@
 
 use MediaWiki\Block\DatabaseBlock;
 use MediaWiki\RenameUser\RenameuserSQL;
+use Wikimedia\TestingAccessWrapper;
 
 /**
  * @group Database
@@ -32,7 +33,12 @@ class RenameuserSQLTest extends MediaWikiIntegrationTestCase {
 		$blockId = $block->getId();
 
 		$renamer = new RenameuserSQL( $oldName, $newName, $userId, $admin );
-		$this->assertTrue( $renamer->rename() );
+		$access = TestingAccessWrapper::newFromObject( $renamer );
+		$this->assertFalse( $access->isTableShared( 'user' ) );
+		$this->assertFalse( $access->isTableShared( 'actor' ) );
+		$this->assertTrue( $access->shouldUpdate( 'user' ) );
+		$this->assertTrue( $access->shouldUpdate( 'actor' ) );
+		$this->assertTrue( $renamer->renameUser()->isGood() );
 
 		$this->newSelectQueryBuilder()
 			->select( 'user_name' )
@@ -73,7 +79,7 @@ class RenameuserSQLTest extends MediaWikiIntegrationTestCase {
 		$user = $this->getMutableTestUser( [ 'sysop', 'bureaucrat' ] )->getUser();
 		$newName = $user->getName() . ' new';
 		$renamer = new RenameuserSQL( $user->getName(), $newName, $user->getId(), $user );
-		$this->assertTrue( $renamer->rename() );
+		$this->assertTrue( $renamer->renameUser()->isGood() );
 
 		$this->newSelectQueryBuilder()
 			->select( 'actor_name' )

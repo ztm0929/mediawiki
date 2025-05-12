@@ -272,9 +272,11 @@ class Xml {
 	 * @param array $attribs Other attributes
 	 * @return string
 	 *
-	 * @deprecated since 1.42, use {@see Html::element} instead
+	 * @deprecated since 1.42, use {@see Html::element} instead; emiting deprecation warnings since 1.44
 	 */
 	public static function span( $text, $class, $attribs = [] ) {
+		wfDeprecated( __METHOD__, '1.42' );
+
 		return self::element( 'span', [ 'class' => $class ] + $attribs, $text );
 	}
 
@@ -302,9 +304,11 @@ class Xml {
 	 * @param array $attribs Other attributes
 	 * @return string HTML
 	 *
-	 * @deprecated since 1.42, use {@see Html::input} instead
+	 * @deprecated since 1.42, use {@see Html::input} instead; emitting warnings since 1.44
 	 */
 	public static function input( $name, $size = false, $value = false, $attribs = [] ) {
+		wfDeprecated( __METHOD__, '1.42' );
+
 		$attributes = [ 'name' => $name ];
 
 		if ( $size ) {
@@ -326,11 +330,13 @@ class Xml {
 	 * @param array $attribs Other attributes
 	 * @return string HTML
 	 *
-	 * @deprecated since 1.42, use {@see Html::input} instead
+	 * @deprecated since 1.42, use {@see Html::input} instead; emiting deprecation warnings since 1.44
 	 */
 	public static function password( $name, $size = false, $value = false,
 		$attribs = []
 	) {
+		wfDeprecated( __METHOD__, '1.42' );
+
 		return self::input( $name, $size, $value,
 			array_merge( $attribs, [ 'type' => 'password' ] ) );
 	}
@@ -356,9 +362,11 @@ class Xml {
 	 * @param array $attribs Array other attributes
 	 * @return string HTML
 	 *
-	 * @deprecated since 1.42, use {@see Html::check} instead
+	 * @deprecated since 1.42, use {@see Html::check} instead; emiting warnings since 1.44
 	 */
 	public static function check( $name, $checked = false, $attribs = [] ) {
+		wfDeprecated( __METHOD__, '1.42' );
+
 		return self::element( 'input', array_merge(
 			[
 				'name' => $name,
@@ -376,9 +384,11 @@ class Xml {
 	 * @param array $attribs Other attributes
 	 * @return string HTML
 	 *
-	 * @deprecated since 1.42, use {@see Html::radio} instead
+	 * @deprecated since 1.42, use {@see Html::radio} instead; emiting warnings since 1.44
 	 */
 	public static function radio( $name, $value, $checked = false, $attribs = [] ) {
+		wfDeprecated( __METHOD__, '1.42' );
+
 		return self::element( 'input', [
 			'name' => $name,
 			'type' => 'radio',
@@ -496,9 +506,11 @@ class Xml {
 	 * @param array $attribs Optional custom attributes
 	 * @return string HTML
 	 *
-	 * @deprecated since 1.42, use {@see Html::submitButton} instead
+	 * @deprecated since 1.42, use {@see Html::submitButton} instead; emitting deprecation warnings since 1.44
 	 */
 	public static function submitButton( $value, $attribs = [] ) {
+		wfDeprecated( __METHOD__, '1.42' );
+
 		$attribs += [
 			'type' => 'submit',
 			'value' => $value,
@@ -681,9 +693,11 @@ class Xml {
 	 * @param array $attribs Any other attributes for the textarea
 	 * @return string
 	 *
-	 * @deprecated since 1.42, use {@see Html::textarea} instead
+	 * @deprecated since 1.42, use {@see Html::textarea} instead; emiting deprecation warnings since 1.44
 	 */
 	public static function textarea( $name, $content, $cols = 40, $rows = 5, $attribs = [] ) {
+		wfDeprecated( __METHOD__, '1.42' );
+
 		return self::element( 'textarea',
 					[
 						'name' => $name,
@@ -707,9 +721,11 @@ class Xml {
 	 * @return string|false String if successful; false upon failure
 	 * @return-taint none
 	 *
-	 * @deprecated since 1.41, use {@see Html::encodeJsVar} instead
+	 * @deprecated since 1.41, use {@see Html::encodeJsVar} instead; emiting deprecation warnings since 1.44
 	 */
 	public static function encodeJsVar( $value, $pretty = false ) {
+		wfDeprecated( __METHOD__, '1.41' );
+
 		return Html::encodeJsVar( $value, $pretty );
 	}
 
@@ -727,9 +743,11 @@ class Xml {
 	 * @return string|false String if successful; false upon failure
 	 * @return-taint none
 	 *
-	 * @deprecated since 1.41, use {@see Html::encodeJsCall} instead
+	 * @deprecated since 1.41, use {@see Html::encodeJsCall} instead; emiting deprecation warnings since 1.44
 	 */
 	public static function encodeJsCall( $name, $args, $pretty = false ) {
+		wfDeprecated( __METHOD__, '1.41' );
+
 		return Html::encodeJsCall( $name, $args, $pretty );
 	}
 
@@ -831,7 +849,13 @@ class Xml {
 			$form .= self::openElement( 'tr' );
 			$form .= self::tags( 'td', [], '' );
 			$form .= self::openElement( 'td', [ 'class' => 'mw-submit' ] )
-				. self::submitButton( wfMessage( $submitLabel )->text(), $submitAttribs )
+				. Html::element(
+					'input',
+					$submitAttribs + [
+						'type' => 'submit',
+						'value' => wfMessage( $submitLabel )->text(),
+					]
+				)
 				. self::closeElement( 'td' );
 			$form .= self::closeElement( 'tr' );
 		}
@@ -847,9 +871,11 @@ class Xml {
 	 * @param array|null $headers An array of strings to use as table headers
 	 * @return string
 	 *
-	 * @deprecated since 1.42; use OOUI or Codex widgets instead
+	 * @deprecated since 1.42; use OOUI or Codex widgets instead; emiting deprecation warnings since 1.44
 	 */
 	public static function buildTable( $rows, $attribs = [], $headers = null ) {
+		wfDeprecated( __METHOD__, '1.42' );
+
 		$s = self::openElement( 'table', $attribs );
 
 		if ( is_array( $headers ) ) {
@@ -888,9 +914,11 @@ class Xml {
 	 * @param string[] $cells An array of strings to put in <td>
 	 * @return string
 	 *
-	 * @deprecated since 1.42; use OOUI or Codex widgets instead
+	 * @deprecated since 1.42; use OOUI or Codex widgets instead; emiting deprecation warnings since 1.44
 	 */
 	public static function buildTableRow( $attribs, $cells ) {
+		wfDeprecated( __METHOD__, '1.42' );
+
 		$s = self::openElement( 'tr', $attribs );
 
 		foreach ( $cells as $id => $cell ) {

@@ -22,7 +22,7 @@ class PagerNavigationBuilder {
 	/** @var MessageLocalizer */
 	private $messageLocalizer;
 
-	/** @var PageReference */
+	/** @var PageReference|null */
 	protected $page;
 	/** @var array<string,string|int|null> */
 	protected $linkQuery = [];
@@ -64,9 +64,6 @@ class PagerNavigationBuilder {
 	/** @var string|null */
 	private $limitTooltipMsg = null;
 
-	/**
-	 * @param MessageLocalizer $messageLocalizer
-	 */
 	public function __construct( MessageLocalizer $messageLocalizer ) {
 		$this->messageLocalizer = $messageLocalizer;
 	}
@@ -287,10 +284,10 @@ class PagerNavigationBuilder {
 	 * @return string HTML
 	 */
 	public function getHtml(): string {
-		if ( !isset( $this->page ) ) {
+		if ( !$this->page ) {
 			throw new RuntimeException( 'page must be set' );
 		}
-		if ( isset( $this->firstMsg ) !== isset( $this->lastMsg ) ) {
+		if ( (bool)$this->firstMsg !== (bool)$this->lastMsg ) {
 			throw new RuntimeException( 'firstMsg and lastMsg must be both set or both unset' );
 		}
 

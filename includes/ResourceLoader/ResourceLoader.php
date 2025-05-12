@@ -23,13 +23,14 @@
 namespace MediaWiki\ResourceLoader;
 
 use Exception;
-use HttpStatus;
 use InvalidArgumentException;
 use Less_Environment;
 use Less_Parser;
 use LogicException;
 use MediaWiki\CommentStore\CommentStore;
 use MediaWiki\Config\Config;
+use MediaWiki\Exception\MWExceptionHandler;
+use MediaWiki\Exception\MWExceptionRenderer;
 use MediaWiki\HookContainer\HookContainer;
 use MediaWiki\Html\Html;
 use MediaWiki\Html\HtmlJsCode;
@@ -43,9 +44,6 @@ use MediaWiki\Request\WebRequest;
 use MediaWiki\Title\Title;
 use MediaWiki\User\Options\UserOptionsLookup;
 use MediaWiki\WikiMap\WikiMap;
-use MWExceptionHandler;
-use MWExceptionRenderer;
-use Net_URL2;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -54,6 +52,7 @@ use stdClass;
 use Throwable;
 use UnexpectedValueException;
 use Wikimedia\DependencyStore\DependencyStore;
+use Wikimedia\Http\HttpStatus;
 use Wikimedia\Minify\CSSMin;
 use Wikimedia\Minify\IdentityMinifierState;
 use Wikimedia\Minify\IndexMap;
@@ -410,7 +409,7 @@ class ResourceLoader implements LoggerAwareInterface {
 			$info = $this->moduleInfos[$name];
 			if ( isset( $info['factory'] ) ) {
 				/** @var Module $object */
-				$object = call_user_func( $info['factory'], $info );
+				$object = $info['factory']( $info );
 			} else {
 				$class = $info['class'] ?? FileModule::class;
 				/** @var Module $object */
@@ -449,7 +448,7 @@ class ResourceLoader implements LoggerAwareInterface {
 			if ( $module ) {
 				$entity = $entitiesByModule[$moduleName];
 				$deps = $depsByEntity[$entity];
-				$paths = Module::expandRelativePaths( $deps['paths'] );
+				$paths = $deps['paths'];
 				$module->setFileDependencies( $context, $paths );
 			}
 		}
@@ -753,7 +752,7 @@ class ResourceLoader implements LoggerAwareInterface {
 		// error list if we're in debug mode.
 		if ( $context->getDebug() ) {
 			$warnings = ob_get_contents();
-			if ( strlen( $warnings ) ) {
+			if ( $warnings !== false && $warnings !== '' ) {
 				$this->errors[] = $warnings;
 			}
 		}
@@ -790,9 +789,9 @@ class ResourceLoader implements LoggerAwareInterface {
 	 * @return ScopedCallback
 	 */
 	protected function measureResponseTime() {
-		$statStart = $_SERVER['REQUEST_TIME_FLOAT'];
-		return new ScopedCallback( function () use ( $statStart ) {
-			$statTiming = microtime( true ) - $statStart;
+		$requestStart = $_SERVER['REQUEST_TIME_FLOAT'];
+		return new ScopedCallback( function () use ( $requestStart ) {
+			$statTiming = microtime( true ) - $requestStart;
 
 			$this->statsFactory->getTiming( 'resourceloader_response_time_seconds' )
 				->copyToStatsdAt( 'resourceloader.responseTime' )
@@ -1113,15 +1112,18 @@ MESSAGE;
 			];
 		}
 
+		$replayMinifier = new ReplayMinifierState;
+		$this->addOneModuleResponse( $context, $replayMinifier, $name, $module, $this->extraHeaders );
+
 		$minifier = new IdentityMinifierState;
-		$this->addOneModuleResponse( $context, $minifier, $name, $module, $this->extraHeaders );
+		$replayMinifier->replayOn( $minifier );
 		$plainContent = $minifier->getMinifiedOutput();
 		if ( $context->getDebug() ) {
 			return [ $plainContent, null ];
 		}
 
 		$isHit = true;
-		$callback = function () use ( $context, $name, $module, &$isHit ) {
+		$callback = function () use ( $context, $replayMinifier, &$isHit ) {
 			$isHit = false;
 			if ( $context->isSourceMap() ) {
 				$minifier = ( new JavaScriptMapperState )
@@ -1132,9 +1134,7 @@ MESSAGE;
 			} else {
 				$minifier = new JavaScriptMinifierState;
 			}
-			// We only need to add one set of headers, and we did that for the identity response
-			$discardedHeaders = null;
-			$this->addOneModuleResponse( $context, $minifier, $name, $module, $discardedHeaders );
+			$replayMinifier->replayOn( $minifier );
 			if ( $context->isSourceMap() ) {
 				$sourceMap = $minifier->getRawSourceMap();
 				$generated = $minifier->getMinifiedOutput();
@@ -1573,7 +1573,7 @@ MESSAGE;
 			. ');';
 	}
 
-	private static function isEmptyObject( stdClass $obj ) {
+	private static function isEmptyObject( stdClass $obj ): bool {
 		foreach ( $obj as $value ) {
 			return false;
 		}
@@ -1590,8 +1590,6 @@ MESSAGE;
 	 * - new HtmlJsCode( '{}' )
 	 * - new stdClass()
 	 * - (object)[]
-	 *
-	 * @param array &$array
 	 */
 	private static function trimArray( array &$array ): void {
 		$i = count( $array );
@@ -1705,7 +1703,7 @@ MESSAGE;
 	public static function makeInlineCodeWithModule( $modules, $script ) {
 		// Adds an array to lazy-created RLQ
 		return '(RLQ=window.RLQ||[]).push(['
-			. self::encodeJsonForScript( $modules ) . ','
+			. json_encode( $modules ) . ','
 			. 'function(){' . trim( $script ) . '}'
 			. ']);';
 	}
@@ -1736,6 +1734,10 @@ MESSAGE;
 	 * @param array $configuration List of configuration values keyed by variable name
 	 * @return string JavaScript code
 	 * @throws LogicException
+	 *
+	 * @deprecated since 1.44, Consider using package files instead or
+	 * you can return mw.config.set() combined with RL\Context::encodeJson, if available.
+	 * If not, use FormatJson::encode.
 	 */
 	public static function makeConfigSetScript( array $configuration ) {
 		$json = self::encodeJsonForScript( $configuration );
@@ -1967,7 +1969,9 @@ MESSAGE;
 	 */
 	public static function isValidModuleName( $moduleName ) {
 		$len = strlen( $moduleName );
-		return $len <= 255 && strcspn( $moduleName, '!,|', 0, $len ) === $len;
+		return ( $len <= 255
+			&& strcspn( $moduleName, '!,|', 0, $len ) === $len )
+			&& ( !str_starts_with( $moduleName, "./" ) && !str_starts_with( $moduleName, "../" ) );
 	}
 
 	/**
@@ -1993,7 +1997,7 @@ MESSAGE;
 		$parser = new Less_Parser;
 		$parser->ModifyVars( $vars );
 		$parser->SetOption( 'relativeUrls', false );
-		$parser->SetOption( 'math', 'always' );
+		$parser->SetOption( 'math', 'parens-division' );
 
 		// SetImportDirs expects an array like [ 'path1' => '', 'path2' => '' ]
 		$formattedImportDirs = array_fill_keys( $importDirs, '' );
@@ -2023,7 +2027,8 @@ MESSAGE;
 				if ( str_starts_with( $path, $importPath ) ) {
 					$restOfPath = substr( $path, strlen( $importPath ) );
 					if ( is_callable( $substPath ) ) {
-						$resolvedPath = call_user_func( $substPath, $restOfPath );
+						// @phan-suppress-next-line PhanUseReturnValueOfNever
+						$resolvedPath = $substPath( $restOfPath );
 					} else {
 						$filePath = $substPath . $restOfPath;
 
@@ -2053,34 +2058,6 @@ MESSAGE;
 	}
 
 	/**
-	 * Resolve a possibly relative URL against a base URL.
-	 *
-	 * The base URL must have a server and should have a protocol.
-	 * A protocol-relative base expands to HTTPS.
-	 *
-	 * This is a standalone version of MediaWiki's UrlUtils::expand (T32956).
-	 *
-	 * @internal For use by core ResourceLoader classes only
-	 * @param string $base
-	 * @param string $url
-	 * @return string URL
-	 */
-	public function expandUrl( string $base, string $url ): string {
-		// Net_URL2::resolve() doesn't allow protocol-relative URLs, but we do.
-		$isProtoRelative = strpos( $base, '//' ) === 0;
-		if ( $isProtoRelative ) {
-			$base = "https:$base";
-		}
-		// Net_URL2::resolve() takes care of throwing if $base doesn't have a server.
-		$baseUrl = new Net_URL2( $base );
-		$ret = $baseUrl->resolve( $url );
-		if ( $isProtoRelative ) {
-			$ret->setScheme( false );
-		}
-		return $ret->getURL();
-	}
-
-	/**
 	 * Run JavaScript or CSS data through a filter, caching the filtered result for future calls.
 	 *
 	 * Available filters are:
@@ -2107,8 +2084,8 @@ MESSAGE;
 		}
 
 		$statsFactory = MediaWikiServices::getInstance()->getStatsFactory();
-		$cache = MediaWikiServices::getInstance()->getObjectCacheFactory()
-			->getLocalServerInstance( CACHE_ANYTHING );
+		// Same as ResourceLoader->srvCache
+		$cache = MediaWikiServices::getInstance()->getLocalServerObjectCache();
 
 		$key = $cache->makeGlobalKey(
 			'resourceloader-filter',

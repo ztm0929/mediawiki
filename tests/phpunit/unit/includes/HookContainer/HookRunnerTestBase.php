@@ -7,7 +7,9 @@ use MediaWiki\HookContainer\HookContainer;
 use MediaWikiUnitTestCase;
 use ReflectionClass;
 use ReflectionMethod;
+use ReflectionNamedType;
 use ReflectionParameter;
+use ReflectionType;
 
 /**
  * Tests that all arguments passed into HookRunner are passed along to HookContainer.
@@ -19,6 +21,22 @@ abstract class HookRunnerTestBase extends MediaWikiUnitTestCase {
 	 * @return Generator|array
 	 */
 	// abstract public static function provideHookRunners();
+
+	/**
+	 * @var string[] Method names ("onFooBar") of hook methods that do not return void,
+	 * even though their hooks are called with the 'abortable' option set to false.
+	 * Ideally there should be no such hooks, but if you have any,
+	 * you can declare them as exceptions here.
+	 */
+	protected static array $unabortableHooksNotReturningVoid = [];
+
+	/**
+	 * @var string[] Method names ("onFooBar") of hook methods that return void,
+	 * even though their hooks are not called with the 'abortable' option set to false.
+	 * Ideally there should be no such hooks (consider adding the 'abortable' option),
+	 * but if you have any, you can declare them as exceptions here.
+	 */
+	protected static array $voidMethodsNotUnabortableHooks = [];
 
 	/**
 	 * Temporary override to make provideHookRunners static.
@@ -120,19 +138,40 @@ abstract class HookRunnerTestBase extends MediaWikiUnitTestCase {
 			}
 		}
 		$hookMethodName = $hookMethod->getName();
+		$hookMethodIsVoid = $this->isVoidType( $hookMethod->getReturnType() );
 		$mockContainer = $this->createNoOpMock( HookContainer::class, [ 'run' ] );
 		$mockContainer
 			->expects( $this->once() )
 			->method( 'run' )
-			->willReturnCallback( function ( string $hookName, array $hookCallParams ) use ( $hookMethodName, $params ) {
+			->willReturnCallback( function ( string $hookName, array $hookCallParams, array $options = [] )
+				use ( $hookMethodName, $hookMethodIsVoid, $params )
+			{
 				// HookContainer builds the method from the hook name with some normalisation,
 				// so the passed hook name and the method must be equal
-				// This is not a function in HookContainer as hooks are hot path
+				// This is not a function in HookContainer as hooks are a hot path
 				// and just avoid the extra call for performance
 				$expectedFuncName = 'on' . strtr( ucfirst( $hookName ), ':-', '__' );
 				$this->assertSame( $expectedFuncName, $hookMethodName,
-					'Interface function must named "on<hook name>" with : or - replaced by _' );
+					'Interface function must be named "on<hook name>" with : or - replaced by _' );
 				$this->assertSame( $params, $hookCallParams );
+
+				if (
+					!( $options['abortable'] ?? true ) &&
+					!in_array( $hookMethodName, static::$unabortableHooksNotReturningVoid, true )
+				) {
+					$this->assertTrue( $hookMethodIsVoid,
+						'Hook method must return void because hook is marked as not abortable' );
+				}
+				if (
+					$hookMethodIsVoid &&
+					!in_array( $hookMethodName, static::$voidMethodsNotUnabortableHooks, true )
+				) {
+					$this->assertArrayHasKey( 'abortable', $options,
+						'Hook must be marked as not abortable because hook method returns void' );
+					$this->assertSame( false, $options['abortable'],
+						'Hook must be marked as not abortable because hook method returns void' );
+				}
+
 				return true;
 			} );
 		$hookRunner = new $hookRunnerClass( $mockContainer );
@@ -167,5 +206,18 @@ abstract class HookRunnerTestBase extends MediaWikiUnitTestCase {
 			};
 		}
 		return $this->createNoOpMock( $paramName );
+	}
+
+	private function isVoidType( ?ReflectionType $type ): bool {
+		if ( $type === null ) {
+			return false;
+		}
+		if ( !( $type instanceof ReflectionNamedType ) ) {
+			return false;
+		}
+		if ( !$type->isBuiltin() ) {
+			return false;
+		}
+		return $type->getName() === 'void';
 	}
 }

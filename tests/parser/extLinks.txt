@@ -768,7 +768,6 @@ External links: link text with spaces
 </p>
 !! end
 
-# Note edge case difference between PHP and Parsoid here.
 !! test
 External links: wiki links within external link (T5695)
 !! options
@@ -782,7 +781,7 @@ parsoid=wt2html
 </p><p><a rel="nofollow" class="external text" href="http://example.com">test </a><a href="/wiki/Wikilink" title="Wikilink">wikilink</a> embedded in ext link
 </p>
 !! html/parsoid
-<p><a rel="mw:ExtLink nofollow" href="http://example.com" class="external autonumber"></a><a rel="mw:WikiLink" href="./Wikilink" title="Wikilink" data-parsoid='{"stx":"simple","a":{"href":"./Wikilink"},"sa":{"href":"wikilink"},"misnested":true}'>wikilink</a><span data-parsoid='{"misnested":true}'> embedded in ext link</span></p>
+<p><a rel="mw:ExtLink nofollow" href="http://example.com" class="external text"></a><a rel="mw:WikiLink" href="./Wikilink" title="Wikilink" data-parsoid='{"stx":"simple","a":{"href":"./Wikilink"},"sa":{"href":"wikilink"},"misnested":true}'>wikilink</a><span data-parsoid='{"misnested":true}'> embedded in ext link</span></p>
 
 <p><a rel="mw:ExtLink nofollow" href="http://example.com" class="external text">test </a><a rel="mw:WikiLink" href="./Wikilink" title="Wikilink" data-parsoid='{"stx":"simple","a":{"href":"./Wikilink"},"sa":{"href":"wikilink"},"misnested":true}'>wikilink</a><span data-parsoid='{"misnested":true}'> embedded in ext link</span></p>
 !! end
@@ -1053,7 +1052,7 @@ Examples from RFC 2732, section 2:
 *http://[2010:836B:4179::836B:4179]
 !! html/php
 <p><a rel="nofollow" class="external free" href="http://[2404:130:0:1000::187:2]/index.php">http://[2404:130:0:1000::187:2]/index.php</a>
-</p><p>Examples from <a class="external mw-magiclink-rfc" rel="nofollow" href="https://tools.ietf.org/html/rfc2373">RFC 2373</a>, section 2.2:
+</p><p>Examples from <a class="external mw-magiclink-rfc" rel="nofollow" href="https://datatracker.ietf.org/doc/html/rfc2373">RFC 2373</a>, section 2.2:
 </p>
 <ul><li><a rel="nofollow" class="external free" href="http://[1080::8:800:200C:417A]/unicast">http://[1080::8:800:200C:417A]/unicast</a></li>
 <li><a rel="nofollow" class="external free" href="http://[FF01::101]/multicast">http://[FF01::101]/multicast</a></li>
@@ -1061,7 +1060,7 @@ Examples from RFC 2732, section 2:
 <li><a rel="nofollow" class="external free" href="http://[::]/unspecified">http://[::]/unspecified</a></li>
 <li><a rel="nofollow" class="external free" href="http://[::13.1.68.3]/ipv4compat">http://[::13.1.68.3]/ipv4compat</a></li>
 <li><a rel="nofollow" class="external free" href="http://[::FFFF:129.144.52.38]/ipv4compat">http://[::FFFF:129.144.52.38]/ipv4compat</a></li></ul>
-<p>Examples from <a class="external mw-magiclink-rfc" rel="nofollow" href="https://tools.ietf.org/html/rfc2732">RFC 2732</a>, section 2:
+<p>Examples from <a class="external mw-magiclink-rfc" rel="nofollow" href="https://datatracker.ietf.org/doc/html/rfc2732">RFC 2732</a>, section 2:
 </p>
 <ul><li><a rel="nofollow" class="external free" href="http://[FEDC:BA98:7654:3210:FEDC:BA98:7654:3210]:80/index.html">http://[FEDC:BA98:7654:3210:FEDC:BA98:7654:3210]:80/index.html</a></li>
 <li><a rel="nofollow" class="external free" href="http://[1080:0:0:0:8:800:200C:417A]/index.html">http://[1080:0:0:0:8:800:200C:417A]/index.html</a></li>
@@ -1073,7 +1072,7 @@ Examples from RFC 2732, section 2:
 !! html/parsoid
 <p><a rel="mw:ExtLink" href="http://[2404:130:0:1000::187:2]/index.php" class="external free">http://[2404:130:0:1000::187:2]/index.php</a></p>
 
-<p>Examples from <a href="https://tools.ietf.org/html/rfc2373" rel="mw:ExtLink" class="external mw-magiclink">RFC 2373</a>, section 2.2:</p>
+<p>Examples from <a href="https://datatracker.ietf.org/doc/html/rfc2373" rel="mw:ExtLink" class="external mw-magiclink">RFC 2373</a>, section 2.2:</p>
 <ul><li><a rel="mw:ExtLink" href="http://[1080::8:800:200C:417A]/unicast" class="external free">http://[1080::8:800:200C:417A]/unicast</a></li>
 <li><a rel="mw:ExtLink" href="http://[FF01::101]/multicast" class="external free">http://[FF01::101]/multicast</a></li>
 <li><a rel="mw:ExtLink" href="http://[::1]/loopback" class="external free">http://[::1]/loopback</a></li>
@@ -1081,7 +1080,7 @@ Examples from RFC 2732, section 2:
 <li><a rel="mw:ExtLink" href="http://[::13.1.68.3]/ipv4compat" class="external free">http://[::13.1.68.3]/ipv4compat</a></li>
 <li><a rel="mw:ExtLink" href="http://[::FFFF:129.144.52.38]/ipv4compat" class="external free">http://[::FFFF:129.144.52.38]/ipv4compat</a></li></ul>
 
-<p>Examples from <a href="https://tools.ietf.org/html/rfc2732" rel="mw:ExtLink" class="external mw-magiclink">RFC 2732</a>, section 2:</p>
+<p>Examples from <a href="https://datatracker.ietf.org/doc/html/rfc2732" rel="mw:ExtLink" class="external mw-magiclink">RFC 2732</a>, section 2:</p>
 <ul><li><a rel="mw:ExtLink" href="http://[FEDC:BA98:7654:3210:FEDC:BA98:7654:3210]:80/index.html" class="external free">http://[FEDC:BA98:7654:3210:FEDC:BA98:7654:3210]:80/index.html</a></li>
 <li><a rel="mw:ExtLink" href="http://[1080:0:0:0:8:800:200C:417A]/index.html" class="external free">http://[1080:0:0:0:8:800:200C:417A]/index.html</a></li>
 <li><a rel="mw:ExtLink" href="http://[3ffe:2a00:100:7031::1]" class="external free">http://[3ffe:2a00:100:7031::1]</a></li>
@@ -1089,6 +1088,19 @@ Examples from RFC 2732, section 2:
 <li><a rel="mw:ExtLink" href="http://[::192.9.5.5]/ipng" class="external free">http://[::192.9.5.5]/ipng</a></li>
 <li><a rel="mw:ExtLink" href="http://[::FFFF:129.144.52.38]:80/index.html" class="external free">http://[::FFFF:129.144.52.38]:80/index.html</a></li>
 <li><a rel="mw:ExtLink" href="http://[2010:836B:4179::836B:4179]" class="external free">http://[2010:836B:4179::836B:4179]</a></li></ul>
+!! end
+
+!! test
+Ensure html2wt b/c for stashed RFC target links (T382963)
+!! options
+parsoid=html2wt
+!! html/parsoid
+<p><a href="https://datatracker.ietf.org/doc/html/rfc1234" rel="mw:ExtLink nofollow" class="external mw-magiclink">RFC 1234</a></p>
+<p><a href="https://tools.ietf.org/html/rfc1234" rel="mw:ExtLink nofollow" class="external mw-magiclink">RFC 1234</a></p>
+!! wikitext
+RFC 1234
+
+RFC 1234
 !! end
 
 # It might make sense to change this behavior; see
@@ -1144,7 +1156,7 @@ Examples from RFC 2732, section 2:
 *[http://[2010:836B:4179::836B:4179] 7]
 !! html/php
 <p><a rel="nofollow" class="external text" href="http://[2404:130:0:1000::187:2]/index.php">test</a>
-</p><p>Examples from <a class="external mw-magiclink-rfc" rel="nofollow" href="https://tools.ietf.org/html/rfc2373">RFC 2373</a>, section 2.2:
+</p><p>Examples from <a class="external mw-magiclink-rfc" rel="nofollow" href="https://datatracker.ietf.org/doc/html/rfc2373">RFC 2373</a>, section 2.2:
 </p>
 <ul><li><a rel="nofollow" class="external text" href="http://[1080::8:800:200C:417A]">unicast</a></li>
 <li><a rel="nofollow" class="external text" href="http://[FF01::101]">multicast</a></li>
@@ -1152,7 +1164,7 @@ Examples from RFC 2732, section 2:
 <li><a rel="nofollow" class="external text" href="http://[::]">unspecified</a></li>
 <li><a rel="nofollow" class="external text" href="http://[::13.1.68.3]">ipv4compat</a></li>
 <li><a rel="nofollow" class="external text" href="http://[::FFFF:129.144.52.38]">ipv4compat</a></li></ul>
-<p>Examples from <a class="external mw-magiclink-rfc" rel="nofollow" href="https://tools.ietf.org/html/rfc2732">RFC 2732</a>, section 2:
+<p>Examples from <a class="external mw-magiclink-rfc" rel="nofollow" href="https://datatracker.ietf.org/doc/html/rfc2732">RFC 2732</a>, section 2:
 </p>
 <ul><li><a rel="nofollow" class="external text" href="http://[FEDC:BA98:7654:3210:FEDC:BA98:7654:3210]:80/index.html">1</a></li>
 <li><a rel="nofollow" class="external text" href="http://[1080:0:0:0:8:800:200C:417A]/index.html">2</a></li>
@@ -1164,7 +1176,7 @@ Examples from RFC 2732, section 2:
 !! html/parsoid
 <p><a rel="mw:ExtLink" href="http://[2404:130:0:1000::187:2]/index.php" class="external text">test</a></p>
 
-<p>Examples from <a href="https://tools.ietf.org/html/rfc2373" rel="mw:ExtLink" class="external mw-magiclink">RFC 2373</a>, section 2.2:</p>
+<p>Examples from <a href="https://datatracker.ietf.org/doc/html/rfc2373" rel="mw:ExtLink" class="external mw-magiclink">RFC 2373</a>, section 2.2:</p>
 <ul><li><a rel="mw:ExtLink" href="http://[1080::8:800:200C:417A]" class="external text">unicast</a></li>
 <li><a rel="mw:ExtLink" href="http://[FF01::101]" class="external text">multicast</a></li>
 <li><a rel="mw:ExtLink" href="http://[::1]/" class="external text">loopback</a></li>
@@ -1172,7 +1184,7 @@ Examples from RFC 2732, section 2:
 <li><a rel="mw:ExtLink" href="http://[::13.1.68.3]" class="external text">ipv4compat</a></li>
 <li><a rel="mw:ExtLink" href="http://[::FFFF:129.144.52.38]" class="external text">ipv4compat</a></li></ul>
 
-<p>Examples from <a href="https://tools.ietf.org/html/rfc2732" rel="mw:ExtLink" class="external mw-magiclink">RFC 2732</a>, section 2:</p>
+<p>Examples from <a href="https://datatracker.ietf.org/doc/html/rfc2732" rel="mw:ExtLink" class="external mw-magiclink">RFC 2732</a>, section 2:</p>
 <ul><li><a rel="mw:ExtLink" href="http://[FEDC:BA98:7654:3210:FEDC:BA98:7654:3210]:80/index.html" class="external text">1</a></li>
 <li><a rel="mw:ExtLink" href="http://[1080:0:0:0:8:800:200C:417A]/index.html" class="external text">2</a></li>
 <li><a rel="mw:ExtLink" href="http://[3ffe:2a00:100:7031::1]" class="external text">3</a></li>
@@ -1358,4 +1370,15 @@ Extlink in square brackets with entity
 <p>[<span typeof="mw:Entity"> </span><a rel="mw:ExtLink nofollow" href="http://test.com" class="external text">123</a><span typeof="mw:Entity"> </span>]</p>
 
 <p><a rel="mw:ExtLink nofollow" href="http://test.com" class="external text">[123</a></p>
+!! end
+
+!! test
+Extlink in indent pre gets link attributes
+!! wikitext
+ [http://test.com 123]
+!! html/php
+<pre><a rel="nofollow" class="external text" href="http://test.com">123</a>
+</pre>
+!! html/parsoid
+<pre><a rel="mw:ExtLink nofollow" href="http://test.com" class="external text">123</a></pre>
 !! end

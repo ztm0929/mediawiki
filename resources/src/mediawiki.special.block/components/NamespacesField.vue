@@ -5,7 +5,7 @@
 		</template>
 		<cdx-multiselect-lookup
 			v-model:input-chips="chips"
-			v-model:selected="selection"
+			v-model:selected="namespaces"
 			class="mw-block-namespaces"
 			:menu-items="menuItems"
 			:menu-config="menuConfig"
@@ -23,6 +23,11 @@ const { storeToRefs } = require( 'pinia' );
 const { CdxField, ChipInputItem, CdxMultiselectLookup } = require( '@wikimedia/codex' );
 const useBlockStore = require( '../stores/block.js' );
 
+/**
+ * Namespaces field component for use by Special:Block.
+ *
+ * @todo Abstract for general use in MediaWiki (T375220)
+ */
 module.exports = exports = defineComponent( {
 	name: 'NamespacesField',
 	components: {
@@ -31,7 +36,6 @@ module.exports = exports = defineComponent( {
 	},
 	setup() {
 		const { namespaces } = storeToRefs( useBlockStore() );
-		const selection = ref( namespaces.value );
 		const mwNamespaces = mw.config.get( 'wgFormattedNamespaces' );
 		mwNamespaces[ '0' ] = mw.msg( 'blanknamespace' );
 		const initialMenuItems = Object.keys( mwNamespaces )
@@ -56,7 +60,7 @@ module.exports = exports = defineComponent( {
 			if ( value ) {
 				// eslint-disable-next-line arrow-body-style
 				menuItems.value = initialMenuItems.filter( ( item ) => {
-					return item.label.toLowerCase().indexOf( value.toLowerCase() ) !== -1;
+					return item.label.toLowerCase().includes( value.toLowerCase() );
 				} );
 			} else {
 				menuItems.value = initialMenuItems;
@@ -69,12 +73,17 @@ module.exports = exports = defineComponent( {
 		 * @param {ChipInputItem[]} newChips
 		 */
 		function onUpdateChips( newChips ) {
-			namespaces.value = newChips.map( ( chip ) => chip.value );
+			// NOTE: This is to avoid recursive updates since namespaces is bound to MultiselectLookup with v-model
+			const uniqueChipValues = newChips.map( ( item ) => item.value );
+			const uniqueNewValues = uniqueChipValues.filter( ( chipValue ) => !namespaces.value.includes( chipValue ) );
+			if ( uniqueNewValues.length !== 0 || namespaces.value.length > uniqueChipValues.length ) {
+				namespaces.value = newChips.map( ( chip ) => chip.value );
+			}
 		}
 
 		return {
 			chips,
-			selection,
+			namespaces,
 			menuItems,
 			menuConfig,
 			onInput,

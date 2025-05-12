@@ -22,14 +22,14 @@
 
 namespace MediaWiki\Api;
 
-use DatabaseLogEntry;
-use LogEventsList;
-use LogFormatterFactory;
-use LogPage;
 use MediaWiki\ChangeTags\ChangeTagsStore;
 use MediaWiki\CommentFormatter\CommentFormatter;
 use MediaWiki\CommentFormatter\RowCommentFormatter;
 use MediaWiki\CommentStore\CommentStore;
+use MediaWiki\Logging\DatabaseLogEntry;
+use MediaWiki\Logging\LogEventsList;
+use MediaWiki\Logging\LogFormatterFactory;
+use MediaWiki\Logging\LogPage;
 use MediaWiki\MainConfigNames;
 use MediaWiki\ParamValidator\TypeDef\NamespaceDef;
 use MediaWiki\ParamValidator\TypeDef\UserDef;
@@ -328,7 +328,7 @@ class ApiQueryLogEvents extends ApiQueryBase {
 		$result->addIndexedTagName( [ 'query', $this->getModuleName() ], 'item' );
 	}
 
-	private function extractRowInfo( $row ) {
+	private function extractRowInfo( \stdClass $row ): array {
 		$logEntry = DatabaseLogEntry::newFromRow( $row );
 		$vals = [
 			ApiResult::META_TYPE => 'assoc',

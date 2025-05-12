@@ -3,13 +3,14 @@
 use MediaWiki\Context\IContextSource;
 use MediaWiki\Context\RequestContext;
 use MediaWiki\Html\FormOptions;
+use MediaWiki\RecentChanges\ChangesListStringOptionsFilterGroup;
 use MediaWiki\SpecialPage\ChangesListSpecialPage;
 use Wikimedia\Rdbms\IDatabase;
 use Wikimedia\Rdbms\IReadableDatabase;
 use Wikimedia\TestingAccessWrapper;
 
 /**
- * @covers \ChangesListStringOptionsFilterGroup
+ * @covers \MediaWiki\RecentChanges\ChangesListStringOptionsFilterGroup
  */
 class ChangesListStringOptionsFilterGroupTest extends MediaWikiUnitTestCase {
 

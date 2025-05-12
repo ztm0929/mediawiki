@@ -20,11 +20,11 @@
 namespace MediaWiki\Rest\Handler\Helper;
 
 use InvalidArgumentException;
-use Liuggio\StatsdClient\Factory\StatsdDataFactoryInterface;
 use MediaWiki\Content\Content;
 use MediaWiki\Edit\ParsoidOutputStash;
 use MediaWiki\Edit\ParsoidRenderID;
 use MediaWiki\Edit\SelserContext;
+use MediaWiki\Exception\MWUnknownContentModelException;
 use MediaWiki\Language\LanguageCode;
 use MediaWiki\MainConfigNames;
 use MediaWiki\Page\PageIdentity;
@@ -44,7 +44,6 @@ use MediaWiki\Revision\RevisionAccessException;
 use MediaWiki\Revision\RevisionLookup;
 use MediaWiki\Revision\RevisionRecord;
 use MediaWiki\Status\Status;
-use MWUnknownContentModelException;
 use Wikimedia\Bcp47Code\Bcp47Code;
 use Wikimedia\Message\MessageValue;
 use Wikimedia\ParamValidator\ParamValidator;
@@ -134,9 +133,6 @@ class HtmlInputTransformHelper {
 		}
 	}
 
-	/**
-	 * @return array
-	 */
 	public function getParamSettings(): array {
 		// JSON body schema:
 		/*
@@ -374,7 +370,14 @@ class HtmlInputTransformHelper {
 					throw new LocalizedHttpException( new MessageValue( "rest-bad-etag", [ $key ] ), 400 );
 				}
 			} else {
-				$originalRendering = ParsoidRenderID::newFromKey( $key );
+				try {
+					$originalRendering = ParsoidRenderID::newFromKey( $key );
+				} catch ( InvalidArgumentException $e ) {
+					throw new LocalizedHttpException(
+						new MessageValue( 'rest-parsoid-bad-render-id', [ $key ] ),
+						400
+					);
+				}
 			}
 		} elseif ( !empty( $original['html'] ) || !empty( $original['data-parsoid'] ) ) {
 			// NOTE: We might have an incomplete PageBundle here, with no HTML but with data-parsoid!
@@ -435,7 +438,6 @@ class HtmlInputTransformHelper {
 
 	/**
 	 * Return HTMLTransform object, so additional context can be provided by calling setters on it.
-	 * @return HtmlToContentTransform
 	 */
 	public function getTransform(): HtmlToContentTransform {
 		return $this->transform;
@@ -443,19 +445,8 @@ class HtmlInputTransformHelper {
 
 	/**
 	 * Set metrics sink.
-	 *
-	 * @note Passing a StatsdDataFactoryInterface here has been deprecated
-	 * since 1.43.
-	 *
-	 * @param StatsFactory|StatsdDataFactoryInterface $statsFactory
 	 */
-	public function setMetrics( $statsFactory ) {
-		if ( $statsFactory instanceof StatsdDataFactoryInterface ) {
-			// Uncomment this once all WMF code has been transitioned, but
-			// leave it in for the 1.43 release.
-			wfDeprecated( __METHOD__ . ' with StatsdDataFactoryInterface', '1.43' );
-			return;
-		}
+	public function setMetrics( StatsFactory $statsFactory ) {
 		$this->statsFactory = $statsFactory;
 
 		if ( $this->transform ) {
@@ -631,8 +622,6 @@ class HtmlInputTransformHelper {
 	/**
 	 * Creates a response containing the content derived from the input HTML.
 	 * This will set the appropriate Content-Type header.
-	 *
-	 * @param ResponseInterface $response
 	 */
 	public function putContent( ResponseInterface $response ) {
 		$content = $this->getContent();

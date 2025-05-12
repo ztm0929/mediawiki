@@ -25,16 +25,17 @@
 
 namespace MediaWiki\Pager;
 
-use DatabaseLogEntry;
-use LogEventsList;
-use LogFormatterFactory;
-use LogPage;
 use MediaWiki\Cache\LinkBatchFactory;
+use MediaWiki\Logging\DatabaseLogEntry;
+use MediaWiki\Logging\LogEventsList;
+use MediaWiki\Logging\LogFormatterFactory;
+use MediaWiki\Logging\LogPage;
 use MediaWiki\MainConfigNames;
 use MediaWiki\MediaWikiServices;
 use MediaWiki\Page\PageReference;
 use MediaWiki\Title\Title;
 use MediaWiki\User\ActorNormalization;
+use MediaWiki\User\UserIdentityValue;
 use Wikimedia\Rdbms\IExpression;
 use Wikimedia\Rdbms\LikeValue;
 
@@ -446,8 +447,7 @@ class LogPager extends ReverseChronologicalPager {
 		$lb = $this->linkBatchFactory->newLinkBatch();
 		foreach ( $this->mResult as $row ) {
 			$lb->add( $row->log_namespace, $row->log_title );
-			$lb->add( NS_USER, $row->log_user_text );
-			$lb->add( NS_USER_TALK, $row->log_user_text );
+			$lb->addUser( new UserIdentityValue( (int)$row->log_user, $row->log_user_text ) );
 			$formatter = $this->logFormatterFactory->newFromRow( $row );
 			foreach ( $formatter->getPreloadTitles() as $title ) {
 				$lb->addObj( $title );
@@ -523,7 +523,7 @@ class LogPager extends ReverseChronologicalPager {
 			$this->mConds[] = $this->mDb->bitAnd( 'log_deleted', LogPage::DELETED_ACTION ) . ' = 0';
 		} elseif ( !$this->getAuthority()->isAllowedAny( 'suppressrevision', 'viewsuppressed' ) ) {
 			$this->mConds[] = $this->mDb->bitAnd( 'log_deleted', LogPage::SUPPRESSED_ACTION ) .
-				' != ' . LogPage::SUPPRESSED_USER;
+				' != ' . LogPage::SUPPRESSED_ACTION;
 		}
 	}
 
@@ -540,7 +540,7 @@ class LogPager extends ReverseChronologicalPager {
 			$this->mConds[] = $this->mDb->bitAnd( 'log_deleted', LogPage::DELETED_USER ) . ' = 0';
 		} elseif ( !$this->getAuthority()->isAllowedAny( 'suppressrevision', 'viewsuppressed' ) ) {
 			$this->mConds[] = $this->mDb->bitAnd( 'log_deleted', LogPage::SUPPRESSED_USER ) .
-				' != ' . LogPage::SUPPRESSED_ACTION;
+				' != ' . LogPage::SUPPRESSED_USER;
 		}
 	}
 }

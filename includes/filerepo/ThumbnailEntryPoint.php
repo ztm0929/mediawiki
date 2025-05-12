@@ -31,11 +31,12 @@
 namespace MediaWiki\FileRepo;
 
 use Exception;
-use File;
 use InvalidArgumentException;
 use MediaTransformError;
 use MediaTransformInvalidParametersException;
 use MediaTransformOutput;
+use MediaWiki\FileRepo\File\File;
+use MediaWiki\FileRepo\File\UnregisteredLocalFile;
 use MediaWiki\Logger\LoggerFactory;
 use MediaWiki\MainConfigNames;
 use MediaWiki\MediaWikiEntryPoint;
@@ -47,8 +48,6 @@ use MediaWiki\Profiler\ProfilingContext;
 use MediaWiki\Request\HeaderCallback;
 use MediaWiki\Status\Status;
 use MediaWiki\Title\Title;
-use RepoGroup;
-use UnregisteredLocalFile;
 use Wikimedia\AtEase\AtEase;
 use Wikimedia\Message\MessageSpecifier;
 
@@ -193,7 +192,7 @@ class ThumbnailEntryPoint extends MediaWikiEntryPoint {
 
 		// Check the source file storage path
 		if ( !$img->exists() ) {
-			$redirected = $this->maybeDoRedirect(
+			$redirectedHasTarget = $this->maybeDoRedirect(
 				$img,
 				$params,
 				$isTemp,
@@ -201,7 +200,7 @@ class ThumbnailEntryPoint extends MediaWikiEntryPoint {
 				$archiveTimestamp
 			);
 
-			if ( !$redirected ) {
+			if ( !$redirectedHasTarget ) {
 				// If it's not a redirect that has a target as a local file, give 404.
 				$this->thumbErrorText(
 					404,
@@ -231,7 +230,7 @@ class ThumbnailEntryPoint extends MediaWikiEntryPoint {
 		// Get the normalized thumbnail name from the parameters...
 		try {
 			$thumbName = $img->thumbName( $params );
-			if ( !strlen( $thumbName ?? '' ) ) { // invalid params?
+			if ( ( $thumbName ?? '' ) === '' ) { // invalid params?
 				throw new MediaTransformInvalidParametersException(
 					'Empty return from File::thumbName'
 				);
@@ -286,7 +285,7 @@ class ThumbnailEntryPoint extends MediaWikiEntryPoint {
 
 		$thumbProxyUrl = $img->getRepo()->getThumbProxyUrl();
 
-		if ( strlen( $thumbProxyUrl ?? '' ) ) {
+		if ( ( $thumbProxyUrl ?? '' ) !== '' ) {
 			$this->proxyThumbnailRequest( $img, $thumbName );
 			// No local fallback when in proxy mode
 			return;
@@ -329,7 +328,7 @@ class ThumbnailEntryPoint extends MediaWikiEntryPoint {
 		$secret = $img->getRepo()->getThumbProxySecret();
 
 		// Pass a secret key shared with the proxied service if any
-		if ( strlen( $secret ?? '' ) ) {
+		if ( ( $secret ?? '' ) !== '' ) {
 			$req->setHeader( 'X-Swift-Secret', $secret );
 		}
 
@@ -611,7 +610,7 @@ EOT;
 	}
 
 	/**
-	 * @return bool true if redirected
+	 * @return bool true if a redirect target was found, false otherwise.
 	 */
 	private function maybeDoRedirect(
 		File $img,
@@ -638,7 +637,17 @@ EOT;
 					)
 				);
 				if ( $targetFile->exists() ) {
-					$newThumbName = $targetFile->thumbName( $params );
+					// Get the normalized thumbnail name from the parameters...
+					try {
+						$newThumbName = $targetFile->thumbName( $params );
+					} catch ( MediaTransformInvalidParametersException $e ) {
+						$this->thumbErrorText(
+							400,
+							'The specified thumbnail parameters are not valid: ' . $e->getMessage()
+						);
+
+						return true;
+					}
 					if ( $isOld ) {
 						$newThumbUrl = $targetFile->getArchiveThumbUrl(
 							$archiveTimestamp . '!' . $targetFile->getName(),
@@ -674,7 +683,7 @@ EOT;
 		return false;
 	}
 
-	private function vary( $header ) {
+	private function vary( string $header ) {
 		$this->varyHeader[] = $header;
 	}
 
@@ -824,7 +833,7 @@ EOT;
 		return false;
 	}
 
-	private function maybeEnforceRateLimits( File $img, array $params ) {
+	private function maybeEnforceRateLimits( File $img, array $params ): bool {
 		$authority = $this->getContext()->getAuthority();
 		$status = PermissionStatus::newEmpty();
 

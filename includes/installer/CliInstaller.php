@@ -175,7 +175,12 @@ class CliInstaller extends Installer {
 		$this->setVar( '_WithDevelopmentSettings', isset( $options['with-developmentsettings'] ) );
 	}
 
-	private function validateExtensions( $type, $directory, $nameLists ) {
+	/**
+	 * @param string $type
+	 * @param string $directory
+	 * @param string|string[] $nameLists
+	 */
+	private function validateExtensions( string $type, string $directory, $nameLists ): Status {
 		$extensions = [];
 		$status = new Status;
 		foreach ( (array)$nameLists as $nameList ) {
@@ -261,6 +266,18 @@ class CliInstaller extends Installer {
 	}
 
 	public function showMessage( $msg, ...$params ) {
+		// @phan-suppress-next-line SecurityCheck-XSS
+		echo $this->getMessageText( $msg, $params ) . "\n";
+		flush();
+	}
+
+	public function showSuccess( $msg, ...$params ) {
+		// @phan-suppress-next-line SecurityCheck-XSS
+		echo $this->getMessageText( $msg, $params ) . "\n";
+		flush();
+	}
+
+	public function showWarning( $msg, ...$params ) {
 		// @phan-suppress-next-line SecurityCheck-XSS
 		echo $this->getMessageText( $msg, $params ) . "\n";
 		flush();

@@ -13,12 +13,8 @@ use Wikimedia\Message\ITextFormatter;
  * @ingroup Language
  */
 class MessageFormatterFactory implements IMessageFormatterFactory {
-
-	/** @var string */
-	private $format;
-
-	/** @var array */
-	private $textFormatters = [];
+	private string $format;
+	private array $textFormatters = [];
 
 	/**
 	 * @internal For use by ServiceWiring only
@@ -31,7 +27,7 @@ class MessageFormatterFactory implements IMessageFormatterFactory {
 	/**
 	 * @inheritDoc
 	 */
-	public function getTextFormatter( $langCode ): ITextFormatter {
+	public function getTextFormatter( string $langCode ): ITextFormatter {
 		if ( !isset( $this->textFormatters[$langCode] ) ) {
 			$this->textFormatters[$langCode] = new TextFormatter(
 				$langCode, $this->format );

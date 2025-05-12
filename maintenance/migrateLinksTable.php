@@ -4,6 +4,7 @@
 require_once __DIR__ . '/Maintenance.php';
 // @codeCoverageIgnoreEnd
 
+use MediaWiki\Maintenance\LoggedUpdateMaintenance;
 use MediaWiki\Title\TitleValue;
 
 /**
@@ -38,10 +39,12 @@ class MigrateLinksTable extends LoggedUpdateMaintenance {
 		$this->setBatchSize( 1000 );
 	}
 
+	/** @inheritDoc */
 	protected function getUpdateKey() {
 		return __CLASS__ . $this->getOption( 'table', '' );
 	}
 
+	/** @inheritDoc */
 	protected function doDBUpdates() {
 		$dbw = $this->getDB( DB_PRIMARY );
 		$mapping = \MediaWiki\Linker\LinksMigration::$mapping;
@@ -93,7 +96,7 @@ class MigrateLinksTable extends LoggedUpdateMaintenance {
 		return true;
 	}
 
-	private function handlePageBatch( $lowPageId, $mapping, $table ) {
+	private function handlePageBatch( int $lowPageId, array $mapping, string $table ) {
 		$batchSize = $this->getBatchSize();
 		$targetColumn = $mapping[$table]['target_id'];
 		$pageIdColumn = $mapping[$table]['page_id'];

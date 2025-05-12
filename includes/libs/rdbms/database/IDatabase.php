@@ -28,9 +28,6 @@ use Wikimedia\ScopedCallback;
  * and query specifics/optimisations.
  */
 
-// Very long type annotations :(
-// phpcs:disable Generic.Files.LineLength
-
 /**
  * Interface to a relational database
  *
@@ -86,10 +83,26 @@ interface IDatabase extends IReadableDatabase {
 	/** Flag to return the lock acquisition timestamp (null if not acquired) */
 	public const LOCK_TIMESTAMP = 1;
 
-	/** Field for getLBInfo()/setLBInfo() */
-	public const LB_TRX_ROUND_ID = 'trxRoundId';
-	/** Field for getLBInfo()/setLBInfo() */
+	/**
+	 * Field for getLBInfo()/setLBInfo(); relevant transaction round level (1 or 0)
+	 * @internal For use in the rdbms library only
+	 */
+	public const LB_TRX_ROUND_LEVEL = 'trxRoundLevel';
+	/**
+	 * Field for getLBInfo()/setLBInfo(); relevant transaction round owner name or null
+	 * @internal For use in the rdbms library only
+	 */
+	public const LB_TRX_ROUND_FNAME = 'trxRoundOwner';
+	/**
+	 * Field for getLBInfo()/setLBInfo(); configured read-only mode explanation or false
+	 * @internal For use in the rdbms library only
+	 */
 	public const LB_READ_ONLY_REASON = 'readOnlyReason';
+	/**
+	 * Alias to LB_TRX_ROUND_FNAME
+	 * @deprecated Since 1.44
+	 */
+	public const LB_TRX_ROUND_ID = self::LB_TRX_ROUND_FNAME;
 
 	/** Primary server than can stream writes to replica servers */
 	public const ROLE_STREAMING_MASTER = 'streaming-master';
@@ -274,6 +287,7 @@ interface IDatabase extends IReadableDatabase {
 	 * Lock all rows meeting the given conditions/options FOR UPDATE
 	 *
 	 * @param string|string[] $table The unqualified name of table(s) (use an array for a join)
+	 * @phpcs:ignore Generic.Files.LineLength
 	 * @param string|IExpression|array<string,?scalar|non-empty-array<int,?scalar>|RawSQLValue>|array<int,string|IExpression> $conds
 	 *   Condition in the format of IDatabase::select() conditions
 	 * @param string $fname Function name for profiling @phan-mandatory-param
@@ -333,6 +347,7 @@ interface IDatabase extends IReadableDatabase {
 	 *   have no defined execution order, so they should not depend on each other. Do not
 	 *   modify AUTOINCREMENT or UUID columns in assignments.
 	 * @param-taint $set exec_sql_numkey
+	 * @phpcs:ignore Generic.Files.LineLength
 	 * @param string|IExpression|array<string,?scalar|non-empty-array<int,?scalar>|RawSQLValue>|array<int,string|IExpression> $conds
 	 *   Condition in the format of IDatabase::select() conditions.
 	 *   In order to prevent possible performance or replication issues or damaging a data
@@ -451,6 +466,7 @@ interface IDatabase extends IReadableDatabase {
 	 * @param string $joinTable The unqualified name of the reference table to join on.
 	 * @param string $delVar The variable to join on, in the first table.
 	 * @param string $joinVar The variable to join on, in the second table.
+	 * @phpcs:ignore Generic.Files.LineLength
 	 * @param string|IExpression|array<string,?scalar|non-empty-array<int,?scalar>|RawSQLValue>|array<int,string|IExpression> $conds
 	 *   Condition array of field names mapped to variables,
 	 *   ANDed together in the WHERE clause
@@ -476,6 +492,7 @@ interface IDatabase extends IReadableDatabase {
 	 *
 	 * @param string $table The unqualified name of a table
 	 * @param-taint $table exec_sql
+	 * @phpcs:ignore Generic.Files.LineLength
 	 * @param string|IExpression|array<string,?scalar|non-empty-array<int,?scalar>|RawSQLValue>|array<int,string|IExpression> $conds
 	 *   Array of conditions. See $conds in IDatabase::select()
 	 *   In order to prevent possible performance or replication issues or damaging a data
@@ -507,6 +524,7 @@ interface IDatabase extends IReadableDatabase {
 	 *    [ 'dest1' => 'source1', ... ]. Source items may be literals
 	 *    rather than field names, but strings should be quoted with
 	 *    IDatabase::addQuotes()
+	 * @phpcs:ignore Generic.Files.LineLength
 	 * @param string|IExpression|array<string,?scalar|non-empty-array<int,?scalar>|RawSQLValue>|array<int,string|IExpression> $conds
 	 *    Condition array. See $conds in IDatabase::select() for
 	 *    the details of the format of condition arrays. May be "*" to copy the
@@ -554,7 +572,6 @@ interface IDatabase extends IReadableDatabase {
 	 * The callback takes the following arguments:
 	 *   - How the current atomic section (if any) or overall transaction (otherwise) ended
 	 *     (IDatabase::TRIGGER_COMMIT or IDatabase::TRIGGER_ROLLBACK)
-	 *   - This IDatabase instance (since 1.32)
 	 *
 	 * Callbacks will execute in the order they were enqueued.
 	 *
@@ -590,7 +607,6 @@ interface IDatabase extends IReadableDatabase {
 	 *
 	 * The callback takes the following arguments:
 	 *   - How the transaction ended (IDatabase::TRIGGER_COMMIT or IDatabase::TRIGGER_IDLE)
-	 *   - This IDatabase instance (since 1.32)
 	 *
 	 * Callbacks will execute in the order they were enqueued.
 	 *
@@ -619,9 +635,6 @@ interface IDatabase extends IReadableDatabase {
 	 *   - a) RDBMS updates, prone to lock timeouts/deadlocks, that require atomicity
 	 *        with respect to the updates in the current transaction (if any)
 	 *   - b) Purges to lightweight cache services due to RDBMS updates
-	 *
-	 * The callback takes the one argument:
-	 *   - This IDatabase instance (since 1.32)
 	 *
 	 * Callbacks will execute in the order they were enqueued.
 	 *

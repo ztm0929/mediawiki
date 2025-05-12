@@ -36,6 +36,7 @@
 require_once __DIR__ . '/Maintenance.php';
 // @codeCoverageIgnoreEnd
 
+use MediaWiki\ChangeTags\ChangeTags;
 use MediaWiki\MainConfigNames;
 use MediaWiki\Maintenance\Maintenance;
 use MediaWiki\Specials\SpecialUpload;
@@ -168,7 +169,7 @@ class ImportImages extends Maintenance {
 		$files = $this->findFiles( $dir, $extensions, $this->hasOption( 'search-recursively' ) );
 		if ( !$files->valid() ) {
 			$this->output( "No suitable files could be found for import.\n" );
-			return;
+			return false;
 		}
 
 		# Initialise the user for this operation
@@ -357,54 +358,63 @@ class ImportImages extends Maintenance {
 
 			if ( $this->hasOption( 'dry' ) ) {
 				$this->output( "done.\n" );
-			} elseif ( $image->recordUpload3(
+			} else {
+				$uploadStatus = $image->recordUpload3(
 				// @phan-suppress-next-line PhanPossiblyUndeclaredVariable
-				$archive->value,
-				$summary,
-				$commentText,
-				$user,
-				// @phan-suppress-next-line PhanTypeMismatchArgumentNullable,PhanPossiblyUndeclaredVariable
-				$props,
-				$timestamp,
-				$tags
-			)->isOK() ) {
-				$this->output( "done.\n" );
+					$archive->value,
+					$summary,
+					$commentText,
+					$user,
+					// @phan-suppress-next-line PhanTypeMismatchArgumentNullable,PhanPossiblyUndeclaredVariable
+					$props,
+					$timestamp,
+					$tags
+				);
 
-				$doProtect = false;
+				if ( $uploadStatus->isOK() ) {
+					$this->output( "done.\n" );
 
-				$protectLevel = $this->getOption( 'protect' );
-				$restrictionLevels = $this->getConfig()->get( MainConfigNames::RestrictionLevels );
+					$doProtect = false;
 
-				if ( $protectLevel && in_array( $protectLevel, $restrictionLevels ) ) {
-					$doProtect = true;
-				}
-				if ( $this->hasOption( 'unprotect' ) ) {
-					$protectLevel = '';
-					$doProtect = true;
-				}
+					$protectLevel = $this->getOption( 'protect' );
+					$restrictionLevels = $this->getConfig()->get( MainConfigNames::RestrictionLevels );
 
-				if ( $doProtect ) {
-					# Protect the file
-					$this->output( "\nWaiting for replica DBs...\n" );
-					// Wait for replica DBs.
-					sleep( 2 ); # Why this sleep?
-					$this->waitForReplication();
-
-					$this->output( "\nSetting image restrictions ..." );
-
-					$cascade = false;
-					$restrictions = [];
-					foreach ( $restrictionStore->listApplicableRestrictionTypes( $title ) as $type ) {
-						$restrictions[$type] = $protectLevel;
+					if ( $protectLevel && in_array( $protectLevel, $restrictionLevels ) ) {
+						$doProtect = true;
+					}
+					if ( $this->hasOption( 'unprotect' ) ) {
+						$protectLevel = '';
+						$doProtect = true;
 					}
 
-					$page = $services->getWikiPageFactory()->newFromTitle( $title );
-					$status = $page->doUpdateRestrictions( $restrictions, [], $cascade, '', $user );
-					$this->output( ( $status->isOK() ? 'done' : 'failed' ) . "\n" );
+					if ( $doProtect ) {
+						# Protect the file
+						$this->output( "\nWaiting for replica DBs...\n" );
+						// Wait for replica DBs.
+						sleep( 2 ); # Why this sleep?
+						$this->waitForReplication();
+
+						$this->output( "\nSetting image restrictions ..." );
+
+						$cascade = false;
+						$restrictions = [];
+						foreach ( $restrictionStore->listApplicableRestrictionTypes( $title ) as $type ) {
+							$restrictions[$type] = $protectLevel;
+						}
+
+						$page = $services->getWikiPageFactory()->newFromTitle( $title );
+						$status = $page->doUpdateRestrictions( $restrictions, [], $cascade, '', $user );
+						$this->output( ( $status->isOK() ? 'done' : 'failed' ) . "\n" );
+					}
+				} elseif ( $uploadStatus->hasMessage( 'fileexists-no-change' ) ) {
+					$this->output( "skipped. (fileexists-no-change)\n" );
+					$svar = 'skipped';
+				} else {
+					$errors = $uploadStatus->getMessages( 'error' );
+					$firstErrorKey = ( $errors !== [] ) ? $errors[0]->getKey() : 'unknown error at recordUpload';
+					$this->output( "failed. ($firstErrorKey)\n" );
+					$svar = 'failed';
 				}
-			} else {
-				$this->output( "failed. (at recordUpload stage)\n" );
-				$svar = 'failed';
 			}
 
 			$statistics[$svar]++;
@@ -428,6 +438,10 @@ class ImportImages extends Maintenance {
 				$this->output( ucfirst( $desc ) . ": $number\n" );
 			}
 		}
+
+		// Return true if there are no failed imports (= zero exit code), or
+		// return false if there are any failed imports (= non-zero exit code)
+		return $statistics['failed'] === 0;
 	}
 
 	/**
@@ -518,7 +532,8 @@ class ImportImages extends Maintenance {
 		return html_entity_decode( $matches[1] );
 	}
 
-	private function getFileUserFromSourceWiki( $wiki_host, $file ) {
+	/** @return string|false */
+	private function getFileUserFromSourceWiki( string $wiki_host, string $file ) {
 		$url = $wiki_host . '/api.php?action=query&format=xml&titles=File:'
 			. rawurlencode( $file ) . '&prop=imageinfo&&iiprop=user';
 		$body = $this->getServiceContainer()->getHttpRequestFactory()->get( $url, [], __METHOD__ );

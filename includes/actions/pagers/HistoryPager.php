@@ -23,12 +23,9 @@
 
 namespace MediaWiki\Pager;
 
-use ChangesList;
-use ChangeTags;
-use HistoryAction;
-use HtmlArmor;
-use MapCacheLRU;
+use MediaWiki\Actions\HistoryAction;
 use MediaWiki\Cache\LinkBatchFactory;
+use MediaWiki\ChangeTags\ChangeTags;
 use MediaWiki\ChangeTags\ChangeTagsStore;
 use MediaWiki\CommentFormatter\CommentFormatter;
 use MediaWiki\HookContainer\HookContainer;
@@ -39,11 +36,15 @@ use MediaWiki\Linker\Linker;
 use MediaWiki\MainConfigNames;
 use MediaWiki\MediaWikiServices;
 use MediaWiki\Parser\Sanitizer;
+use MediaWiki\RecentChanges\ChangesList;
 use MediaWiki\Revision\RevisionRecord;
 use MediaWiki\Revision\RevisionStore;
 use MediaWiki\SpecialPage\SpecialPage;
+use MediaWiki\User\UserIdentityValue;
 use MediaWiki\Watchlist\WatchlistManager;
 use stdClass;
+use Wikimedia\HtmlArmor\HtmlArmor;
+use Wikimedia\MapCacheLRU\MapCacheLRU;
 use Wikimedia\Rdbms\IDBAccessObject;
 
 /**
@@ -166,7 +167,7 @@ class HistoryPager extends ReverseChronologicalPager {
 	public function getQueryInfo() {
 		$queryBuilder = $this->revisionStore->newSelectQueryBuilder( $this->mDb )
 			->joinComment()
-			->joinUser()
+			->joinUser()->field( 'user_id' )
 			->useIndex( [ 'revision' => 'rev_page_timestamp' ] )
 			->where( [ 'rev_page' => $this->getWikiPage()->getId() ] )
 			->andWhere( $this->conds );
@@ -205,8 +206,7 @@ class HistoryPager extends ReverseChronologicalPager {
 				$revIds[] = (int)$row->rev_parent_id;
 			}
 			if ( $row->user_name !== null ) {
-				$batch->add( NS_USER, $row->user_name );
-				$batch->add( NS_USER_TALK, $row->user_name );
+				$batch->addUser( new UserIdentityValue( (int)$row->user_id, $row->user_name ) );
 			} else { # for anons or usernames of imported revisions
 				$batch->add( NS_USER, $row->rev_user_text );
 				$batch->add( NS_USER_TALK, $row->rev_user_text );
@@ -308,7 +308,7 @@ class HistoryPager extends ReverseChronologicalPager {
 		return $s;
 	}
 
-	private function getRevisionButton( $name, $msg, $class ) {
+	private function getRevisionButton( string $name, string $msg, string $class ): string {
 		$this->preventClickjacking = true;
 		$element = Html::element(
 			'button',
@@ -519,10 +519,7 @@ class HistoryPager extends ReverseChronologicalPager {
 			[ Sanitizer::class, 'isReservedDataAttribute' ],
 			ARRAY_FILTER_USE_KEY
 		);
-
-		if ( $classes ) {
-			$attribs['class'] = implode( ' ', $classes );
-		}
+		$attribs['class'] = $classes;
 
 		return Html::rawElement( 'li', $attribs, $s ) . "\n";
 	}

@@ -88,14 +88,13 @@ class PostgresSettingsForm extends DatabaseSettingsForm {
 
 	/**
 	 * Downcast the DatabaseInstaller
-	 * @return PostgresInstaller
 	 */
 	private function getPostgresInstaller(): PostgresInstaller {
 		// @phan-suppress-next-line PhanTypeMismatchReturnSuperType
 		return $this->dbInstaller;
 	}
 
-	private function getPostgresUtils() {
+	private function getPostgresUtils(): PostgresUtils {
 		return new PostgresUtils( $this->dbInstaller );
 	}
 

@@ -26,16 +26,17 @@ use MediaWiki\Language\Language;
 use MediaWiki\MediaWikiServices;
 use MediaWiki\Message\Message;
 use MediaWiki\Output\OutputPage;
+use MediaWiki\Page\WikiPage;
 use MediaWiki\Permissions\Authority;
 use MediaWiki\Request\WebRequest;
+use MediaWiki\Session\CsrfTokenSet;
+use MediaWiki\Skin\Skin;
 use MediaWiki\Title\Title;
 use MediaWiki\User\User;
-use Skin;
-use Timing;
 use Wikimedia\Assert\Assert;
 use Wikimedia\Message\MessageParam;
 use Wikimedia\Message\MessageSpecifier;
-use WikiPage;
+use Wikimedia\Timing\Timing;
 
 /**
  * An IContextSource implementation which will inherit context from another source
@@ -109,9 +110,6 @@ class DerivativeContext extends ContextSource implements MutableContext {
 		$this->setContext( $context );
 	}
 
-	/**
-	 * @param Config $config
-	 */
 	public function setConfig( Config $config ) {
 		$this->config = $config;
 	}
@@ -130,9 +128,6 @@ class DerivativeContext extends ContextSource implements MutableContext {
 		return $this->timing ?: $this->getContext()->getTiming();
 	}
 
-	/**
-	 * @param WebRequest $request
-	 */
 	public function setRequest( WebRequest $request ) {
 		$this->request = $request;
 	}
@@ -144,9 +139,10 @@ class DerivativeContext extends ContextSource implements MutableContext {
 		return $this->request ?: $this->getContext()->getRequest();
 	}
 
-	/**
-	 * @param Title $title
-	 */
+	public function getCsrfTokenSet(): CsrfTokenSet {
+		return new CsrfTokenSet( $this->getRequest() );
+	}
+
 	public function setTitle( Title $title ) {
 		$this->title = $title;
 		$this->action = null;
@@ -235,9 +231,6 @@ class DerivativeContext extends ContextSource implements MutableContext {
 		return $this->action;
 	}
 
-	/**
-	 * @param OutputPage $output
-	 */
 	public function setOutput( OutputPage $output ) {
 		$this->output = $output;
 	}
@@ -249,9 +242,6 @@ class DerivativeContext extends ContextSource implements MutableContext {
 		return $this->output ?: $this->getContext()->getOutput();
 	}
 
-	/**
-	 * @param User $user
-	 */
 	public function setUser( User $user ) {
 		$this->authority = $user;
 		$this->user = $user;
@@ -307,9 +297,6 @@ class DerivativeContext extends ContextSource implements MutableContext {
 		return $this->lang ?: $this->getContext()->getLanguage();
 	}
 
-	/**
-	 * @param Skin $skin
-	 */
 	public function setSkin( Skin $skin ) {
 		$this->skin = clone $skin;
 		$this->skin->setContext( $this );

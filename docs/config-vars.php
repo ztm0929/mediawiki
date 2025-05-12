@@ -115,12 +115,6 @@ $wgExtensionDirectory = null;
 $wgStyleDirectory = null;
 
 /**
- * Config variable stub for the BaseDirectory setting, for use by phpdoc and IDEs.
- * @see MediaWiki\MainConfigSchema::BaseDirectory
- */
-$wgBaseDirectory = null;
-
-/**
  * Config variable stub for the ArticlePath setting, for use by phpdoc and IDEs.
  * @see MediaWiki\MainConfigSchema::ArticlePath
  */
@@ -777,6 +771,18 @@ $wgThumbLimits = null;
 $wgThumbnailNamespaces = null;
 
 /**
+ * Config variable stub for the ThumbnailSteps setting, for use by phpdoc and IDEs.
+ * @see MediaWiki\MainConfigSchema::ThumbnailSteps
+ */
+$wgThumbnailSteps = null;
+
+/**
+ * Config variable stub for the ThumbnailStepsRatio setting, for use by phpdoc and IDEs.
+ * @see MediaWiki\MainConfigSchema::ThumbnailStepsRatio
+ */
+$wgThumbnailStepsRatio = null;
+
+/**
  * Config variable stub for the ThumbnailBuckets setting, for use by phpdoc and IDEs.
  * @see MediaWiki\MainConfigSchema::ThumbnailBuckets
  */
@@ -1245,6 +1251,18 @@ $wgVirtualDomainsMapping = null;
 $wgPageLinksSchemaMigrationStage = null;
 
 /**
+ * Config variable stub for the FileSchemaMigrationStage setting, for use by phpdoc and IDEs.
+ * @see MediaWiki\MainConfigSchema::FileSchemaMigrationStage
+ */
+$wgFileSchemaMigrationStage = null;
+
+/**
+ * Config variable stub for the CategoryLinksSchemaMigrationStage setting, for use by phpdoc and IDEs.
+ * @see MediaWiki\MainConfigSchema::CategoryLinksSchemaMigrationStage
+ */
+$wgCategoryLinksSchemaMigrationStage = null;
+
+/**
  * Config variable stub for the ExternalLinksDomainGaps setting, for use by phpdoc and IDEs.
  * @see MediaWiki\MainConfigSchema::ExternalLinksDomainGaps
  */
@@ -1533,10 +1551,16 @@ $wgChronologyProtectorSecret = null;
 $wgParserCacheExpireTime = null;
 
 /**
- * Config variable stub for the ParserCacheNewKeySchemaRatio setting, for use by phpdoc and IDEs.
- * @see MediaWiki\MainConfigSchema::ParserCacheNewKeySchemaRatio
+ * Config variable stub for the ParserCacheAsyncExpireTime setting, for use by phpdoc and IDEs.
+ * @see MediaWiki\MainConfigSchema::ParserCacheAsyncExpireTime
  */
-$wgParserCacheNewKeySchemaRatio = null;
+$wgParserCacheAsyncExpireTime = null;
+
+/**
+ * Config variable stub for the ParserCacheAsyncRefreshJobs setting, for use by phpdoc and IDEs.
+ * @see MediaWiki\MainConfigSchema::ParserCacheAsyncRefreshJobs
+ */
+$wgParserCacheAsyncRefreshJobs = null;
 
 /**
  * Config variable stub for the OldRevisionParserCacheExpireTime setting, for use by phpdoc and IDEs.
@@ -2356,6 +2380,12 @@ $wgTidyConfig = null;
 $wgParsoidSettings = null;
 
 /**
+ * Config variable stub for the ParsoidExperimentalParserFunctionOutput setting, for use by phpdoc and IDEs.
+ * @see MediaWiki\MainConfigSchema::ParsoidExperimentalParserFunctionOutput
+ */
+$wgParsoidExperimentalParserFunctionOutput = null;
+
+/**
  * Config variable stub for the ParserEnableLegacyMediaDOM setting, for use by phpdoc and IDEs.
  * @see MediaWiki\MainConfigSchema::ParserEnableLegacyMediaDOM
  * @deprecated since 1.41
@@ -2365,6 +2395,7 @@ $wgParserEnableLegacyMediaDOM = null;
 /**
  * Config variable stub for the ParserEnableLegacyHeadingDOM setting, for use by phpdoc and IDEs.
  * @see MediaWiki\MainConfigSchema::ParserEnableLegacyHeadingDOM
+ * @deprecated since 1.44
  */
 $wgParserEnableLegacyHeadingDOM = null;
 
@@ -2686,6 +2717,12 @@ $wgSessionProviders = null;
  * @see MediaWiki\MainConfigSchema::AutoCreateTempUser
  */
 $wgAutoCreateTempUser = null;
+
+/**
+ * Config variable stub for the AutoblockExemptions setting, for use by phpdoc and IDEs.
+ * @see MediaWiki\MainConfigSchema::AutoblockExemptions
+ */
+$wgAutoblockExemptions = null;
 
 /**
  * Config variable stub for the AutoblockExpiry setting, for use by phpdoc and IDEs.
@@ -3550,6 +3587,12 @@ $wgGitBin = null;
  * @see MediaWiki\MainConfigSchema::GitRepositoryViewers
  */
 $wgGitRepositoryViewers = null;
+
+/**
+ * Config variable stub for the InstallerInitialPages setting, for use by phpdoc and IDEs.
+ * @see MediaWiki\MainConfigSchema::InstallerInitialPages
+ */
+$wgInstallerInitialPages = null;
 
 /**
  * Config variable stub for the RCMaxAge setting, for use by phpdoc and IDEs.
@@ -4477,3 +4520,9 @@ $wgEnableProtectionIndicators = null;
  * @see MediaWiki\MainConfigSchema::OutputPipelineStages
  */
 $wgOutputPipelineStages = null;
+
+/**
+ * Config variable stub for the FeatureShutdown setting, for use by phpdoc and IDEs.
+ * @see MediaWiki\MainConfigSchema::FeatureShutdown
+ */
+$wgFeatureShutdown = null;

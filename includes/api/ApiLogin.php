@@ -88,6 +88,20 @@ class ApiLogin extends ApiBase {
 	}
 
 	/**
+	 * Obtain an error code from a message, used for internal logs.
+	 * @param Message|string|array $message
+	 * @return string
+	 */
+	private function getErrorCode( $message ) {
+		$message = Message::newFromSpecifier( $message );
+		if ( $message instanceof ApiMessage ) {
+			return $message->getApiCode();
+		} else {
+			return $message->getKey();
+		}
+	}
+
+	/**
 	 * Executes the log-in attempt using the parameters passed. If
 	 * the log-in succeeds, it attaches a cookie to the session
 	 * and outputs the user id, username, and session token. If a
@@ -148,7 +162,7 @@ class ApiLogin extends ApiBase {
 
 		// Try bot passwords
 		if ( $authRes === false && $this->getConfig()->get( MainConfigNames::EnableBotPasswords ) ) {
-			$botLoginData = BotPassword::canonicalizeLoginData( $params['name'], $params['password'] );
+			$botLoginData = BotPassword::canonicalizeLoginData( $params['name'] ?? '', $params['password'] ?? '' );
 			if ( $botLoginData ) {
 				$status = BotPassword::login(
 					$botLoginData[0], $botLoginData[1], $this->getRequest()
@@ -265,7 +279,8 @@ class ApiLogin extends ApiBase {
 			'successful' => $authRes === 'Success',
 			'accountType' => $this->identityUtils->getShortUserTypeInternal( $performer ),
 			'loginType' => $loginType,
-			'status' => $authRes,
+			'status' => ( $authRes === 'Failed' && isset( $message ) ) ? $this->getErrorCode( $message ) : $authRes,
+			'full_message' => isset( $message ) ? $this->formatMessage( $message ) : '',
 		] );
 	}
 

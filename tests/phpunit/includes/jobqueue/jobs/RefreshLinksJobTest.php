@@ -3,13 +3,15 @@
 use MediaWiki\CommentStore\CommentStoreComment;
 use MediaWiki\Content\Content;
 use MediaWiki\Content\WikitextContent;
+use MediaWiki\JobQueue\Jobs\RefreshLinksJob;
 use MediaWiki\Page\PageAssertionException;
+use MediaWiki\Page\WikiPage;
 use MediaWiki\Title\Title;
 use Wikimedia\Rdbms\Platform\ISQLPlatform;
 use Wikimedia\Stats\StatsFactory;
 
 /**
- * @covers \RefreshLinksJob
+ * @covers \MediaWiki\JobQueue\Jobs\RefreshLinksJob
  *
  * @group JobQueue
  * @group Database
@@ -91,7 +93,8 @@ class RefreshLinksJobTest extends MediaWikiIntegrationTestCase {
 
 		$result = $job->run();
 
-		$this->assertFalse( $result );
+		// We don't want to retry the job so it is returned with true.
+		$this->assertTrue( $result );
 		$this->assertSame( 1, $totalFailuresCounter->getSampleCount() );
 		$this->assertSame( "Revision {$prevRev->getId()} is not current", $job->getLastError() );
 	}

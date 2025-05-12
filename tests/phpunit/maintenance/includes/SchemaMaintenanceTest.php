@@ -10,8 +10,8 @@ use RecursiveIteratorIterator;
 
 /**
  * @covers \MediaWiki\Maintenance\SchemaMaintenance
- * @covers GenerateSchemaChangeSql
- * @covers GenerateSchemaSql
+ * @covers \GenerateSchemaChangeSql
+ * @covers \GenerateSchemaSql
  */
 class SchemaMaintenanceTest extends MaintenanceBaseTestCase {
 
@@ -58,7 +58,7 @@ class SchemaMaintenanceTest extends MaintenanceBaseTestCase {
 	public static function provideExecuteForFatalErrorWithJsonFileSpecified() {
 		return [
 			'Validate mode when JSON file empty' => [ [ 'validate' => 1 ], '', '/does not exist/' ],
-			'Validate mode when JSON file is not valid JSON' => [ [ 'validate' => 1 ], '{{{{', '/invalid json/' ],
+			'Validate mode when JSON file is not valid JSON' => [ [ 'validate' => 1 ], '{{{{', '/Invalid JSON/' ],
 			'Validate mode when JSON file is not a valid schema' => [
 				[ 'validate' => 1 ], '{"abc": "test"}', '/did not pass validation/',
 			],

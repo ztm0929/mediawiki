@@ -29,7 +29,7 @@ use Wikimedia\ObjectFactory\ObjectFactory;
 
 /**
  * @since 1.37
- * @package MediaWiki\User\CentralId
+ * @ingroup User
  */
 class CentralIdLookupFactory {
 
@@ -79,8 +79,6 @@ class CentralIdLookupFactory {
 
 	/**
 	 * Get the ID of the default central ID provider.
-	 *
-	 * @return string
 	 */
 	public function getDefaultProviderId(): string {
 		return $this->defaultProvider;

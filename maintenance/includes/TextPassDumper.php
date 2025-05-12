@@ -35,6 +35,8 @@ require_once __DIR__ . '/../../includes/export/WikiExporter.php';
 use BaseDump;
 use Exception;
 use ExportProgressFilter;
+use MediaWiki\Exception\MWException;
+use MediaWiki\Exception\MWUnknownContentModelException;
 use MediaWiki\Revision\RevisionStore;
 use MediaWiki\Revision\SlotRecord;
 use MediaWiki\Settings\SettingsBuilder;
@@ -44,8 +46,6 @@ use MediaWiki\Storage\BlobStore;
 use MediaWiki\Storage\SqlBlobStore;
 use MediaWiki\WikiMap\WikiMap;
 use MediaWiki\Xml\Xml;
-use MWException;
-use MWUnknownContentModelException;
 use RuntimeException;
 use WikiExporter;
 use Wikimedia\AtEase\AtEase;
@@ -274,7 +274,7 @@ TEXT
 		$this->report( true );
 	}
 
-	protected function processFileOpt( $opt ) {
+	protected function processFileOpt( string $opt ): string {
 		$split = explode( ':', $opt, 2 );
 		$val = $split[0];
 		$param = '';
@@ -376,7 +376,7 @@ TEXT
 		$this->timeExceeded = true;
 	}
 
-	private function checkIfTimeExceeded() {
+	private function checkIfTimeExceeded(): bool {
 		if ( $this->maxTimeAllowed
 			&& ( $this->lastTime - $this->timeOfCheckpoint > $this->maxTimeAllowed )
 		) {
@@ -575,7 +575,7 @@ TEXT
 
 				// Trying to get prefetch, if it has not been tried before
 				// @phan-suppress-next-line PhanSuspiciousValueComparisonInLoop
-				if ( $text === false && isset( $this->prefetch ) && $prefetchNotTried ) {
+				if ( $text === false && $this->prefetch && $prefetchNotTried ) {
 					$prefetchNotTried = false;
 					$tryIsPrefetch = true;
 					$text = $this->prefetch->prefetch(
@@ -747,7 +747,7 @@ TEXT
 		return $text;
 	}
 
-	protected function openSpawn() {
+	protected function openSpawn(): bool {
 		global $IP;
 
 		$wiki = WikiMap::getCurrentWikiId();
@@ -808,7 +808,7 @@ TEXT
 		}
 		$this->spawnErr = false;
 		if ( $this->spawnProc ) {
-			pclose( $this->spawnProc );
+			proc_close( $this->spawnProc );
 		}
 		$this->spawnProc = false;
 		AtEase::restoreWarnings();
@@ -888,7 +888,7 @@ TEXT
 		return $normalized;
 	}
 
-	protected function startElement( $parser, $name, $attribs ) {
+	protected function startElement( $parser, string $name, array $attribs ) {
 		$this->checkpointJustWritten = false;
 
 		$this->clearOpenElement( null );
@@ -929,12 +929,12 @@ TEXT
 
 			unset( $attribs['id'] );
 			unset( $attribs['location'] );
-			if ( strlen( $text ) > 0 ) {
+			if ( $text !== '' ) {
 				$attribs['xml:space'] = 'preserve';
 			}
 
 			$this->openElement = [ $name, $attribs ];
-			if ( strlen( $text ) > 0 ) {
+			if ( $text !== '' ) {
 				$this->characterData( $parser, $text );
 			}
 		} else {
@@ -942,7 +942,7 @@ TEXT
 		}
 	}
 
-	protected function endElement( $parser, $name ) {
+	protected function endElement( $parser, string $name ) {
 		$this->checkpointJustWritten = false;
 
 		if ( $this->openElement ) {
@@ -1003,7 +1003,7 @@ TEXT
 		}
 	}
 
-	protected function characterData( $parser, $data ) {
+	protected function characterData( $parser, string $data ) {
 		$this->clearOpenElement( null );
 		if ( $this->lastName == "id" ) {
 			if ( $this->state == "revision" ) {
@@ -1035,14 +1035,14 @@ TEXT
 		$this->buffer .= htmlspecialchars( $data, ENT_COMPAT );
 	}
 
-	protected function clearOpenElement( $style ) {
+	protected function clearOpenElement( ?string $style ) {
 		if ( $this->openElement ) {
 			$this->buffer .= Xml::element( $this->openElement[0], $this->openElement[1], $style );
 			$this->openElement = false;
 		}
 	}
 
-	private function isValidTextId( $id ) {
+	private function isValidTextId( string $id ): bool {
 		if ( preg_match( '/:/', $id ) ) {
 			return $id !== 'tt:0';
 		} elseif ( preg_match( '/^\d+$/', $id ) ) {

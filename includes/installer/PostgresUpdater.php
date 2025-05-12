@@ -75,7 +75,6 @@ class PostgresUpdater extends DatabaseUpdater {
 			[ 'changeField', 'l10n_cache', 'lc_value', 'TEXT', '' ],
 			[ 'changeField', 'l10n_cache', 'lc_key', 'VARCHAR(255)', '' ],
 			[ 'addIndex', 'l10n_cache', 'l10n_cache_pkey', 'patch-l10n_cache-pk.sql' ],
-			[ 'addIndex', 'module_deps', 'module_deps_pkey', 'patch-module_deps-pk.sql' ],
 			[ 'changeField', 'redirect', 'rd_namespace', 'INT', 'rd_namespace::INT DEFAULT 0' ],
 			[ 'setDefault', 'redirect', 'rd_title', '' ],
 			[ 'setDefault', 'redirect', 'rd_from', 0 ],
@@ -441,9 +440,13 @@ class PostgresUpdater extends DatabaseUpdater {
 			[ 'dropTable', 'ipblocks' ],
 			[ 'dropField', 'pagelinks', 'pl_title', 'patch-pagelinks-drop-pl_title.sql' ],
 			[ 'addPostDatabaseUpdateMaintenance', FixAutoblockLogTitles::class ],
-			[ 'renameIndex', 'searchindex', 'si_page', 'PRIMARY', false, 'patch-searchindex-pk-titlelength.sql' ],
+			[ 'migrateSearchindex' ],
 
 			// 1.44
+			[ 'addTable', 'file', 'patch-file.sql' ],
+			[ 'addField', 'categorylinks', 'cl_target_id', 'patch-categorylinks-target_id.sql' ],
+			[ 'addTable', 'collation', 'patch-collation.sql' ],
+			[ 'dropTable', 'module_deps' ],
 		];
 	}
 
@@ -709,7 +712,7 @@ END;
 			$this->output( "Changing column type of '$table.$field' from '{$fi->type()}' to '$newtype'\n" );
 			$table = $this->db->addIdentifierQuotes( $table );
 			$sql = "ALTER TABLE $table ALTER $field TYPE $newtype";
-			if ( strlen( $default ) ) {
+			if ( $default !== '' ) {
 				$res = [];
 				if ( preg_match( '/DEFAULT (.+)/', $default, $res ) ) {
 					$sqldef = "ALTER TABLE $table ALTER $field SET DEFAULT $res[1]";
@@ -970,5 +973,33 @@ END;
 		}
 
 		return false;
+	}
+
+	/**
+	 * Replaces unique index with primary key,modifies si_title length
+	 *
+	 * @since 1.43
+	 * @return void
+	 */
+	protected function migrateSearchindex() {
+		$updateKey = 'searchindex-pk-titlelength';
+		if ( !$this->tableExists( 'searchindex' ) ) {
+			return;
+		}
+
+		$primaryIndexExists = $this->db->indexExists( 'searchindex', 'searchindex_pkey' );
+		if ( $this->updateRowExists( $updateKey ) || ( $primaryIndexExists ) ) {
+			$this->output( "...searchindex table has already been migrated.\n" );
+			if ( !$this->updateRowExists( $updateKey ) ) {
+				$this->insertUpdateRow( $updateKey );
+			}
+			return;
+		}
+
+		$apply = $this->applyPatch( 'patch-searchindex-pk-titlelength.sql', false, '...migrating searchindex table' );
+
+		if ( $apply ) {
+			$this->insertUpdateRow( $updateKey );
+		}
 	}
 }

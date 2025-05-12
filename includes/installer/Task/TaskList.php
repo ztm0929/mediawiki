@@ -19,7 +19,6 @@ class TaskList implements \IteratorAggregate {
 
 	/**
 	 * Add a task to the list
-	 * @param Task $task
 	 */
 	public function add( Task $task ) {
 		$this->unsortedTasks[] = $task;
@@ -71,6 +70,10 @@ class TaskList implements \IteratorAggregate {
 			foreach ( (array)$task->getProvidedNames() as $alias ) {
 				$tasksByName[$alias][] = $task;
 			}
+
+			if ( !$task->isPostInstall() ) {
+				$tasksByName['install'][] = $task;
+			}
 		}
 		return $tasksByName;
 	}
@@ -94,7 +97,15 @@ class TaskList implements \IteratorAggregate {
 		$name = $task->getName();
 		$id = spl_object_id( $task );
 		$unresolvedTasks[$id] = $task;
-		foreach ( (array)$task->getDependencies() as $depName ) {
+		$deps = (array)$task->getDependencies();
+
+		// Post-install tasks implicitly depend on the install alias, which all
+		// other tasks have
+		if ( $task->isPostInstall() ) {
+			$deps[] = 'install';
+		}
+
+		foreach ( $deps as $depName ) {
 			if ( !isset( $tasksByName[$depName] ) ) {
 				throw new RuntimeException(
 					"Can't find dependency \"$depName\" required by task \"$name\"" );

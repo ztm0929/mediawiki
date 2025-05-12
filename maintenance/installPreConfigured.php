@@ -8,14 +8,21 @@ use MediaWiki\Installer\Task\Task;
 use MediaWiki\Installer\Task\TaskFactory;
 use MediaWiki\Installer\Task\TaskList;
 use MediaWiki\Installer\Task\TaskRunner;
-use MediaWiki\MainConfigNames;
+use MediaWiki\Maintenance\Maintenance;
 use MediaWiki\Registration\ExtensionRegistry;
 use MediaWiki\Settings\SettingsBuilder;
 use Symfony\Component\Yaml\Yaml;
 
 require_once __DIR__ . '/Maintenance.php';
 
+/**
+ * @since 1.44
+ * @stable to extend
+ */
 class InstallPreConfigured extends Maintenance {
+	/** @var ITaskContext|null */
+	private $taskContext;
+
 	public function __construct() {
 		parent::__construct();
 		$this->addDescription( 'Create the database and tables for a new wiki, ' .
@@ -34,12 +41,13 @@ class InstallPreConfigured extends Maintenance {
 			'Show the list of tasks to be executed, do not actually install' );
 	}
 
+	/** @inheritDoc */
+	public function getDbType() {
+		return Maintenance::DB_ADMIN;
+	}
+
 	public function finalSetup( SettingsBuilder $settingsBuilder ) {
 		parent::finalSetup( $settingsBuilder );
-
-		// Load installer i18n
-		$settingsBuilder->putConfigValue( MainConfigNames::MessagesDirs,
-			[ MW_INSTALL_PATH . '/includes/installer/i18n' ] );
 
 		// Apply override-config options. Doing this here instead of in
 		// AddWikiTaskContext::setConfigVar() allows the options to be available
@@ -53,19 +61,21 @@ class InstallPreConfigured extends Maintenance {
 		}
 	}
 
+	/** @inheritDoc */
 	public function execute() {
-		$context = $this->createTaskContext();
+		$context = $this->getTaskContext();
 		$taskFactory = $this->createTaskFactory( $context );
 		$taskList = $this->createTaskList( $taskFactory );
 		$taskRunner = $this->createTaskRunner( $taskList, $taskFactory );
 
+		Installer::disableStorage( $this->getConfig(), 'en' );
+
 		if ( $this->hasOption( 'show-tasks' ) ) {
 			$taskRunner->loadExtensions();
 			echo $taskRunner->dumpTaskList();
-			return true;
+			return false;
 		}
 
-		Installer::disableStorage( $this->getConfig(), 'en' );
 		if ( $this->hasOption( 'task' ) ) {
 			$status = $taskRunner->runNamedTask( $this->getOption( 'task' ) );
 		} else {
@@ -73,6 +83,7 @@ class InstallPreConfigured extends Maintenance {
 		}
 
 		if ( $status->isOK() ) {
+			$this->output( "Installation complete.\n" );
 			return true;
 		} else {
 			$this->error( "Installation failed at task \"" .
@@ -97,6 +108,16 @@ class InstallPreConfigured extends Maintenance {
 	}
 
 	/**
+	 * @return AddWikiTaskContext
+	 */
+	protected function getTaskContext() {
+		if ( !$this->taskContext ) {
+			$this->taskContext = $this->createTaskContext();
+		}
+		return $this->taskContext;
+	}
+
+	/**
 	 * Get the context for running tasks, with config overrides from the
 	 * command line.
 	 *
@@ -116,7 +137,21 @@ class InstallPreConfigured extends Maintenance {
 			[ $name, $value ] = $this->parseKeyValue( $str );
 			$context->setOption( $name, $value );
 		}
+		foreach ( $this->getSubclassDefaultOptions() as $name => $value ) {
+			$context->setOption( $name, $value );
+		}
+
 		return $context;
+	}
+
+	/**
+	 * Get installer options overridden by a subclass
+	 *
+	 * @stable to override
+	 * @return array
+	 */
+	protected function getSubclassDefaultOptions() {
+		return [];
 	}
 
 	/**
@@ -142,7 +177,23 @@ class InstallPreConfigured extends Maintenance {
 				]
 			]
 		) );
+		foreach ( $this->getExtraTaskSpecs() as $spec ) {
+			$taskList->add( $taskFactory->create( $spec ) );
+		}
 		return $taskList;
+	}
+
+	/**
+	 * Subclasses can override this to provide specification arrays for extra
+	 * tasks to run during install.
+	 *
+	 * @see TaskFactory::create()
+	 * @stable to override
+	 *
+	 * @return array
+	 */
+	protected function getExtraTaskSpecs() {
+		return [];
 	}
 
 	/**

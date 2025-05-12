@@ -18,12 +18,16 @@
  * @file
  */
 
+namespace MediaWiki\RecentChanges;
+
+use LogicException;
 use MediaWiki\Cache\BacklinkCache;
 use MediaWiki\MediaWikiServices;
 use MediaWiki\Page\PageIdentity;
 use MediaWiki\Revision\RevisionRecord;
 use MediaWiki\Title\Title;
 use MediaWiki\User\UserIdentity;
+use Wikimedia\Rdbms\IDBAccessObject;
 
 /**
  * Helper class for category membership changes
@@ -116,8 +120,6 @@ class CategoryMembershipChange {
 
 	/**
 	 * Create a recentchanges entry for category additions
-	 *
-	 * @param PageIdentity $categoryPage
 	 */
 	public function triggerCategoryAddedNotification( PageIdentity $categoryPage ) {
 		$this->createRecentChangesEntry( $categoryPage, self::CATEGORY_ADDITION );
@@ -125,8 +127,6 @@ class CategoryMembershipChange {
 
 	/**
 	 * Create a recentchanges entry for category removals
-	 *
-	 * @param PageIdentity $categoryPage
 	 */
 	public function triggerCategoryRemovedNotification( PageIdentity $categoryPage ) {
 		$this->createRecentChangesEntry( $categoryPage, self::CATEGORY_REMOVAL );
@@ -278,3 +278,6 @@ class CategoryMembershipChange {
 	}
 
 }
+
+/** @deprecated class alias since 1.44 */
+class_alias( CategoryMembershipChange::class, 'CategoryMembershipChange' );

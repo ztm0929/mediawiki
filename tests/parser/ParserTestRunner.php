@@ -29,6 +29,7 @@
 use MediaWiki\Content\WikitextContent;
 use MediaWiki\Context\IContextSource;
 use MediaWiki\Context\RequestContext;
+use MediaWiki\FileRepo\RepoGroup;
 use MediaWiki\HookContainer\HookRunner;
 use MediaWiki\Html\Html;
 use MediaWiki\Interwiki\ClassicInterwikiLookup;
@@ -41,11 +42,13 @@ use MediaWiki\Parser\Parser;
 use MediaWiki\Parser\ParserOptions;
 use MediaWiki\Parser\ParserOutput;
 use MediaWiki\Parser\ParserOutputFlags;
+use MediaWiki\Parser\ParserOutputLinkTypes;
 use MediaWiki\Permissions\UltimateAuthority;
 use MediaWiki\Registration\ExtensionRegistry;
 use MediaWiki\Revision\MutableRevisionRecord;
 use MediaWiki\Revision\RevisionRecord;
 use MediaWiki\Revision\SlotRecord;
+use MediaWiki\Skin\Skin;
 use MediaWiki\Title\Title;
 use MediaWiki\Title\TitleValue;
 use MediaWiki\User\User;
@@ -242,6 +245,7 @@ class ParserTestRunner {
 			'updateKnownFailures' => false,
 			'changetree' => null,
 			'update-tests' => false,
+			'update-unexpected' => false,
 			// Options can also match those in ParserTestModes::TEST_MODES
 			// but we don't need to initialize those here; they will be
 			// accessed via $this->requestedTestModes instead.
@@ -280,9 +284,6 @@ class ParserTestRunner {
 		$this->uploadDir = $this->options['upload-dir'];
 	}
 
-	/**
-	 * @return array
-	 */
 	public function getOptions(): array {
 		return $this->options;
 	}
@@ -483,6 +484,61 @@ class ParserTestRunner {
 			}
 		);
 
+		// Fake a magic word for {{#divtag}}/{{#spantag}} defined in ParserTestParserHook
+		$extraMagicWords = [
+			[
+				'name' => 'divtagpf',
+				'aliases' => [ '#divtag' ],
+				'case-sensitive' => true,
+			],
+			[
+				'name' => 'spantagpf',
+				'aliases' => [ '#spantag' ],
+				'case-sensitive' => true,
+			],
+		];
+		// Add magic words used in Parsoid-native extension modules
+		if ( method_exists( ParsoidParserHook::class, 'getParserTestConfigFileName' ) ) {
+			$filename = ParsoidParserHook::getParserTestConfigFileName();
+			if ( file_exists( $filename ) ) {
+				$config = json_decode( file_get_contents( $filename ), true );
+				$extraMagicWords = array_merge(
+					$extraMagicWords, $config['magicwords'] ?? []
+				);
+			}
+		}
+		$teardown[] = $this->registerHook(
+			'GetMagicVariableIDs',
+			static function ( &$variableIDs ) use ( $extraMagicWords ) {
+				foreach ( $extraMagicWords as [ 'name' => $key ] ) {
+					$variableIDs[] = $key;
+				}
+			}
+		);
+		$teardown[] = $this->registerHook(
+			'LocalisationCacheRecache',
+			static function ( $cache, $code, &$alldata, $unused ) use ( $extraMagicWords ) {
+				foreach ( $extraMagicWords as [
+					'name' => $key,
+					'aliases' => $aliases,
+					'case-sensitive' => $caseSensitive ]
+				) {
+					array_unshift( $aliases, (int)$caseSensitive );
+					$alldata['magicWords'][$key] = $aliases;
+				}
+				return true;
+			}
+		);
+		// Register extensions and parser functions with legacy parser
+		// even for Parsoid to ensure that preprocessor strips tags
+		// correctly.
+		$teardown[] = $this->registerHook(
+			'ParserFirstCallInit',
+			static function ( $parser ) {
+				ParserTestParserHook::setup( $parser );
+			}
+		);
+
 		$this->appendNamespaceSetup( $setup, $teardown );
 
 		// Set up interwikis and append teardown function
@@ -510,7 +566,7 @@ class ParserTestRunner {
 		return $this->createTeardownObject( $teardown, $nextTeardown );
 	}
 
-	private function appendNamespaceSetup( &$setup, &$teardown ) {
+	private function appendNamespaceSetup( array &$setup, array &$teardown ) {
 		// Add a namespace shadowing a interwiki link, to test
 		// proper precedence when resolving links. (T53680)
 		$setup['wgExtraNamespaces'] = [
@@ -672,7 +728,6 @@ class ParserTestRunner {
 
 	/**
 	 * Ensure one of the given setup stages has been done, throw an exception otherwise.
-	 * @param string $funcName
 	 */
 	protected function checkSetupDone( string $funcName ) {
 		if ( !$this->setupDone[$funcName] ) {
@@ -811,7 +866,7 @@ class ParserTestRunner {
 		$teardown[] = $reset;
 
 		// This affects title normalization in links. It invalidates
-		// MediaWikiTitleCodec objects.
+		// TitleParser objects.
 		// These interwikis should have 'iw_url' that matches wgServer.
 		$setup['wgLocalInterwikis'] = [ 'local', 'project', 'mi' ];
 		$reset = function () {
@@ -831,7 +886,6 @@ class ParserTestRunner {
 		$services = MediaWikiServices::getInstance();
 		$services->resetServiceForTesting( 'TitleFormatter' );
 		$services->resetServiceForTesting( 'TitleParser' );
-		$services->resetServiceForTesting( '_MediaWikiTitleCodec' );
 		$services->resetServiceForTesting( 'LinkRenderer' );
 		$services->resetServiceForTesting( 'LinkRendererFactory' );
 		$services->resetServiceForTesting( 'NamespaceInfo' );
@@ -950,7 +1004,7 @@ class ParserTestRunner {
 					$this->updateKnownFailures( $filename, $testFileInfo );
 				}
 
-				if ( $this->options['update-tests'] ) {
+				if ( $this->options['update-tests'] || $this->options['update-unexpected'] ) {
 					$this->updateTests( $filename, $testFileInfo, !$inParsoidMode );
 				}
 
@@ -1146,7 +1200,8 @@ class ParserTestRunner {
 				if ( $modeStr === 'selser' && $test->changetree === null ) {
 					// This is an auto-edit test with either a CLI changetree
 					// or a change tree that should be generated
-					$mode = new ParserTestMode( 'selser-auto', json_decode( $runner->options['changetree'] ) );
+					$changetree = $runner->options['changetree'] ? json_decode( $runner->options['changetree'] ) : null;
+					$mode = new ParserTestMode( 'selser-auto', $changetree );
 				}
 				$result = $this->runTestInternal( $test, $mode );
 				$ok = $ok && $result->isSuccess();
@@ -1217,7 +1272,7 @@ class ParserTestRunner {
 		foreach ( $testFileInfo->testCases as $t ) {
 			$testName = $t->testName;
 			$fail = $t->knownFailures[$isLegacy ? 'legacy' : 'wt2html'] ?? null;
-			$html = $isLegacy ? $t->legacyHtml : $t->parsoidHtml;
+			$html = $isLegacy ? $t->legacyHtml : ( $t->sections['html/parsoid+integrated'] ?? $t->parsoidHtml );
 			if ( $isLegacy && $fail === null ) {
 				$fail = $t->knownFailures['metadata'] ?? null;
 				$html = self::getLegacyMetadataSection( $t );
@@ -1240,10 +1295,6 @@ class ParserTestRunner {
 		file_put_contents( $filename, $fileContent );
 	}
 
-	/**
-	 * @param string $wikitext
-	 * @return array
-	 */
 	private function getRevRecordProperties( string $wikitext ): array {
 		return [
 			'pageid' => 187, // Some random fake page id
@@ -1332,10 +1383,10 @@ class ParserTestRunner {
 		}
 
 		if ( isset( $opts['maxincludesize'] ) ) {
-			$options->setMaxIncludeSize( $opts['maxincludesize'] );
+			$options->setMaxIncludeSize( (int)$opts['maxincludesize'] );
 		}
 		if ( isset( $opts['maxtemplatedepth'] ) ) {
-			$options->setMaxTemplateDepth( $opts['maxtemplatedepth'] );
+			$options->setMaxTemplateDepth( (int)$opts['maxtemplatedepth'] );
 		}
 
 		return [ $title, $options, $revProps['revid'] ];
@@ -1455,8 +1506,10 @@ class ParserTestRunner {
 			$section = $opts['section'];
 			$out = $parser->getSection( $wikitext, $section );
 		} elseif ( isset( $opts['replace'] ) ) {
-			$section = $opts['replace'][0];
-			$replace = $opts['replace'][1];
+			$o = $opts['replace'];
+			'@phan-var array $o'; // Phan gets confused about types
+			$section = $o[0];
+			$replace = $o[1];
 			$out = $parser->replaceSection( $wikitext, $section, $replace );
 		} elseif ( isset( $opts['comment'] ) ) {
 			$out = MediaWikiServices::getInstance()->getCommentFormatter()->format( $wikitext, $title, $local );
@@ -1500,7 +1553,7 @@ class ParserTestRunner {
 
 		$testResult = new ParserTestResult( $test, $mode, $expected, $out );
 
-		if ( $this->options['update-tests'] && !$testResult->isSuccess() ) {
+		if ( ( $this->options['update-tests'] || $this->options['update-unexpected'] ) && !$testResult->isSuccess() ) {
 			$test->knownFailures["$mode"] = $rawOut;
 		}
 
@@ -1515,7 +1568,7 @@ class ParserTestRunner {
 		return $testResult;
 	}
 
-	private function getSkin( $name ) {
+	private function getSkin( string $name ): Skin {
 		static $skinCache = [];
 
 		$skinCache[$name] ??= MediaWikiServices::getInstance()->getSkinFactory()->makeSkin( $name );
@@ -1561,10 +1614,15 @@ class ParserTestRunner {
 			}
 		}
 
+		// unlike other link types, this dumps the 'sort' property as well
 		if ( isset( $opts['cat'] ) ) {
 			$defaultSortKey = $output->getPageProperty( 'defaultsort' ) ?? '';
-			foreach ( $output->getCategoryNames() as $name ) {
-				$sortkey = $output->getCategorySortKey( $name ) ?: $defaultSortKey;
+			foreach (
+				$output->getLinkList( ParserOutputLinkTypes::CATEGORY )
+				as [ 'link' => $link, 'sort' => $sort ]
+			) {
+				$sortkey = $sort ?: $defaultSortKey;
+				$name = $link->getDBkey();
 				$after[] = "cat=$name sort=$sortkey";
 			}
 		}
@@ -1575,42 +1633,26 @@ class ParserTestRunner {
 			}
 		}
 
+		// Unlike other link types, this is stored as text, not dbkey
 		if ( isset( $opts['ill'] ) ) {
-			foreach ( $output->getLanguageLinks() as $ll ) {
-				$after[] = "ill=$ll";
+			foreach (
+				$output->getLinkList( ParserOutputLinkTypes::LANGUAGE )
+				as [ 'link' => $ll ]
+			) {
+				$after[] = "ill=" . Title::newFromLinkTarget( $ll )->getFullText();
 			}
 		}
 
-		if ( isset( $opts['iwl'] ) ) {
-			foreach ( $output->getInterwikiLinks() as $prefix => $arr ) {
-				foreach ( $arr as $dbk => $ignore ) {
-					$after[] = "iwl=$prefix:$dbk";
-				}
-			}
-		}
-
-		if ( isset( $opts['links'] ) ) {
-			foreach ( $output->getLinks() as $ns => $arr ) {
-				foreach ( $arr as $dbk => $page_id ) {
-					$nsName = $titleFormatter->getNamespaceName( $ns, $dbk );
-					$t = $nsName ? "$nsName:$dbk" : $dbk;
-					$after[] = "link=$t";
-				}
-			}
-		}
-
-		if ( isset( $opts['special'] ) ) {
-			foreach ( $output->getLinksSpecial() as $dbk => $ignore ) {
-				$after[] = "special=Special:$dbk";
-			}
-		}
-
-		if ( isset( $opts['templates'] ) ) {
-			foreach ( $output->getTemplates() as $ns => $arr ) {
-				foreach ( $arr as $dbk => $page_id ) {
-					$nsName = $titleFormatter->getNamespaceName( $ns, $dbk );
-					$t = $nsName ? "$nsName:$dbk" : $dbk;
-					$after[] = "template=$t";
+		$linkoptions = [
+			[ 'iwl', 'iwl=', ParserOutputLinkTypes::INTERWIKI ],
+			[ 'links', 'link=', ParserOutputLinkTypes::LOCAL ],
+			[ 'special', 'special=', ParserOutputLinkTypes::SPECIAL ],
+			[ 'templates', 'template=', ParserOutputLinkTypes::TEMPLATE ],
+		];
+		foreach ( $linkoptions as [ $optName, $prefix, $type ] ) {
+			if ( isset( $opts[$optName] ) ) {
+				foreach ( $output->getLinkList( $type ) as [ 'link' => $ll ] ) {
+					$after[] = $prefix . Title::newFromLinkTarget( $ll )->getPrefixedDBkey();
 				}
 			}
 		}
@@ -1667,7 +1709,11 @@ class ParserTestRunner {
 			}
 		}
 		if ( isset( $opts['showmedia'] ) ) {
-			$after[] = 'images=' . implode( ', ', array_keys( $output->getImages() ) );
+			$images = array_map(
+				static fn ( $item ) => $item['link']->getDBkey(),
+				$output->getLinkList( ParserOutputLinkTypes::MEDIA )
+			);
+			$after[] = 'images=' . implode( ', ', $images );
 		}
 		if ( $metadataExpected === null ) {
 			// legacy format, add $before and $after to $out
@@ -1747,6 +1793,14 @@ class ParserTestRunner {
 			$test->knownFailures["$mode"] = $rawActual;
 		}
 
+		if ( $this->options['update-unexpected'] ) {
+			if ( $knownFailureChanged || $unexpectedFail ) {
+				$test->knownFailures["$mode"] = $rawActual;
+			} else {
+				unset( $test->knownFailures["$mode"] );
+			}
+		}
+
 		if ( $unexpectedPass ) {
 			if ( !$this->options['updateKnownFailures'] ) {
 				$this->unexpectedTestPasses = true;
@@ -1760,7 +1814,7 @@ class ParserTestRunner {
 		return new ParserTestResult( $test, $mode, $expected, $actual );
 	}
 
-	private function fetchCachedDoc( $parsoid, $pageConfig, $test ) {
+	private function fetchCachedDoc( Parsoid $parsoid, PageConfig $pageConfig, ParserTest $test ): Document {
 		// If cachedBODYstr is not already set, create it here.
 		if ( $test->cachedBODYstr === null ) {
 			$this->wt2html( $parsoid, $pageConfig, $test, new ParserTestMode( 'cache' ) );
@@ -1769,7 +1823,7 @@ class ParserTestRunner {
 		return $doc;
 	}
 
-	private function fetchCachedWt( $parsoid, $pageConfig, $test ) {
+	private function fetchCachedWt( Parsoid $parsoid, PageConfig $pageConfig, ParserTest $test ): string {
 		// If cachedWTstr is not already set, set it here.
 		if ( ( $test->cachedWTstr ?? null ) === null ) {
 			$this->html2wt( $parsoid, $pageConfig, $test, new ParserTestMode( 'cache' ) );
@@ -2015,6 +2069,7 @@ class ParserTestRunner {
 	private function runSelserEditTest(
 		Parsoid $parsoid, PageConfig $pageConfig, ParserTest $test, ParserTestMode $mode, Document $doc
 	): array {
+		// @phan-suppress-next-line PhanTypeMismatchArgumentNullable $test->changetree is non-null here
 		$test->applyChanges( [], $doc, $test->changetree );
 		$editedHTML = ContentUtils::toXML( DOMCompat::getBody( $doc ) );
 
@@ -2111,7 +2166,7 @@ class ParserTestRunner {
 				$doc = $this->fetchCachedDoc( $parsoid, $pageConfig, $test );
 				$test->seed = $i . '';
 				$test->changetree = $test->generateChanges( $doc );
-				if ( $test->changetree ) {
+				if ( $test->changetree ) { // testing for [] not null
 					// new mode with the generated changetree
 					$nmode = new ParserTestMode( 'selser', $test->changetree );
 					[ $out, $expected ] = $this->runSelserEditTest( $parsoid, $pageConfig, $test, $nmode, $doc );
@@ -2123,6 +2178,7 @@ class ParserTestRunner {
 				}
 				// $test->changetree can be [] which is a NOP for testing
 				// but not a NOP for duplicate change tree tests.
+				// @phan-suppress-next-line PhanTypeMismatchArgumentNullable $test->changetree is non-null here
 				if ( $test->isDuplicateChangeTree( $test->changetree ) ) {
 					// Once we get a duplicate change tree, we can no longer
 					// generate and run new tests. So, be done now!
@@ -2414,7 +2470,7 @@ class ParserTestRunner {
 		return $this->createTeardownObject( $teardown, $nextTeardown );
 	}
 
-	private function resetLanguageServices( array &$setup, array &$teardown, $resetVariant = false ) {
+	private function resetLanguageServices( array &$setup, array &$teardown, bool $resetVariant = false ) {
 		$mwServices = MediaWikiServices::getInstance();
 		$reset = static function () use ( $mwServices, $resetVariant ) {
 			$mwServices->resetServiceForTesting( 'ContentLanguage' );
@@ -2931,10 +2987,9 @@ class ParserTestRunner {
 		}
 
 		// Optionally use mock parser, to make debugging of actual parser tests simpler.
-		// But initialise the MessageCache clone first, don't let MessageCache
-		// get a reference to the mock object.
+		// But initialise the MessageParser first so that it gets the original ParserFactory.
 		if ( $this->disableSaveParse ) {
-			$services->getMessageCache()->getParser();
+			$services->getMessageCache();
 			$services->disableService( 'Parser' );
 			$services->disableService( 'ParserFactory' );
 			$services->redefineService(

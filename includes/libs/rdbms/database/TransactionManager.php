@@ -181,7 +181,7 @@ class TransactionManager {
 			);
 		} elseif ( $this->trxStatus === self::STATUS_TRX_OK && $this->trxStatusIgnoredCause ) {
 			[ $iLastError, $iLastErrno, $iFname ] = $this->trxStatusIgnoredCause;
-			call_user_func( $deprecationLogger,
+			$deprecationLogger(
 				"Caller from $fname ignored an error originally raised from $iFname: " .
 				"[$iLastErrno] $iLastError"
 			);
@@ -202,8 +202,6 @@ class TransactionManager {
 
 	/**
 	 * Mark the transaction as requiring rollback (STATUS_TRX_ERROR) due to an error
-	 *
-	 * @param Throwable $trxError
 	 */
 	public function setTransactionError( Throwable $trxError ) {
 		if ( $this->trxStatus !== self::STATUS_TRX_ERROR ) {
@@ -212,9 +210,6 @@ class TransactionManager {
 		}
 	}
 
-	/**
-	 * @param array|null $trxStatusIgnoredCause
-	 */
 	public function setTrxStatusIgnoredCause( ?array $trxStatusIgnoredCause ): void {
 		$this->trxStatusIgnoredCause = $trxStatusIgnoredCause;
 	}
@@ -231,8 +226,6 @@ class TransactionManager {
 
 	/**
 	 * Flag the session as needing a reset due to an error, if not already flagged
-	 *
-	 * @param Throwable $sessionError
 	 */
 	public function setSessionError( Throwable $sessionError ) {
 		$this->sessionError ??= $sessionError;
@@ -693,8 +686,8 @@ class TransactionManager {
 		foreach ( $this->trxEndCallbacks as $key => $entry ) {
 			if ( in_array( $entry[2], $excisedSectionsId, true ) ) {
 				$callback = $entry[0];
-				$this->trxEndCallbacks[$key][0] = static function ( $t, $db ) use ( $callback ) {
-					return $callback( IDatabase::TRIGGER_ROLLBACK, $db );
+				$this->trxEndCallbacks[$key][0] = static function () use ( $callback ) {
+					return $callback( IDatabase::TRIGGER_ROLLBACK );
 				};
 				// This "on resolution" callback no longer belongs to a section.
 				$this->trxEndCallbacks[$key][2] = null;
@@ -716,11 +709,10 @@ class TransactionManager {
 	/**
 	 * Consume and run any "on transaction pre-commit" callbacks
 	 *
-	 * @param IDatabase $db
 	 * @return int Number of callbacks attempted
 	 * @throws Throwable Any exception thrown by a callback
 	 */
-	public function runOnTransactionPreCommitCallbacks( IDatabase $db ): int {
+	public function runOnTransactionPreCommitCallbacks(): int {
 		$count = 0;
 
 		// Drain the queues of transaction "precommit" callbacks until it is empty
@@ -730,7 +722,7 @@ class TransactionManager {
 			$count += count( $callbackEntries );
 			foreach ( $callbackEntries as $entry ) {
 				try {
-					$entry[0]( $db );
+					$entry[0]();
 				} catch ( Throwable $trxError ) {
 					$this->setTransactionError( $trxError );
 					throw $trxError;
@@ -868,7 +860,7 @@ class TransactionManager {
 		}
 	}
 
-	public function onFlushSnapshot( IDatabase $db, $fname, $flush, $trxRoundId ) {
+	public function onFlushSnapshot( IDatabase $db, $fname, $flush, $trxRoundFname ) {
 		if ( $this->explicitTrxActive() ) {
 			// Committing this transaction would break callers that assume it is still open
 			throw new DBUnexpectedError(
@@ -886,13 +878,13 @@ class TransactionManager {
 			);
 		} elseif (
 			$this->trxLevel() &&
-			$trxRoundId &&
+			$trxRoundFname !== null &&
 			$flush !== IDatabase::FLUSHING_INTERNAL &&
 			$flush !== IDatabase::FLUSHING_ALL_PEERS
 		) {
 			$this->logger->warning(
 				"$fname: Expected mass snapshot flush of all peer transactions " .
-				"in the explicit transactions round '{$trxRoundId}'",
+				"in the explicit transactions round '{$trxRoundFname}'",
 				[
 					'exception' => new RuntimeException(),
 					'db_log_category' => 'trx'

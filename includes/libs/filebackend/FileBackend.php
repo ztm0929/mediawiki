@@ -33,7 +33,6 @@ namespace Wikimedia\FileBackend;
 
 use InvalidArgumentException;
 use LockManager;
-use MediaWiki\FileBackend\FSFile\TempFSFileFactory;
 use NullLockManager;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerInterface;
@@ -43,6 +42,7 @@ use Shellbox\Command\BoxedCommand;
 use StatusValue;
 use Wikimedia\FileBackend\FSFile\FSFile;
 use Wikimedia\FileBackend\FSFile\TempFSFile;
+use Wikimedia\FileBackend\FSFile\TempFSFileFactory;
 use Wikimedia\Message\MessageParam;
 use Wikimedia\Message\MessageSpecifier;
 use Wikimedia\ScopedCallback;
@@ -139,6 +139,8 @@ abstract class FileBackend implements LoggerAwareInterface {
 	private $obResetFunc;
 	/** @var callable */
 	private $headerFunc;
+	/** @var callable */
+	private $asyncHandler;
 	/** @var array Option map for use with HTTPFileStreamer */
 	protected $streamerOptions;
 	/** @var callable|null */
@@ -200,6 +202,7 @@ abstract class FileBackend implements LoggerAwareInterface {
 	 *   - obResetFunc : alternative callback to clear the output buffer
 	 *   - streamMimeFunc : alternative method to determine the content type from the path
 	 *   - headerFunc : alternative callback for sending response headers
+	 *   - asyncHandler : callback for scheduling deferred updated
 	 *   - logger : Optional PSR logger object.
 	 *   - profiler : Optional callback that takes a section name argument and returns
 	 *      a ScopedCallback instance that ends the profile section in its destructor.
@@ -233,6 +236,7 @@ abstract class FileBackend implements LoggerAwareInterface {
 		$this->obResetFunc = $config['obResetFunc']
 			?? [ self::class, 'resetOutputBufferTheDefaultWay' ];
 		$this->headerFunc = $config['headerFunc'] ?? 'header';
+		$this->asyncHandler = $config['asyncHandler'] ?? null;
 		$this->streamerOptions = [
 			'obResetFunc' => $this->obResetFunc,
 			'headerFunc' => $this->headerFunc,
@@ -255,6 +259,19 @@ abstract class FileBackend implements LoggerAwareInterface {
 
 	protected function header( $header ) {
 		( $this->headerFunc )( $header );
+	}
+
+	/**
+	 * @param callable $update
+	 *
+	 * @return void
+	 */
+	protected function callNowOrLater( callable $update ) {
+		if ( $this->asyncHandler ) {
+			( $this->asyncHandler )( $update );
+		} else {
+			$update();
+		}
 	}
 
 	protected function resetOutputBuffer() {
@@ -1672,7 +1689,7 @@ abstract class FileBackend implements LoggerAwareInterface {
 		}
 		$parts[] = $type;
 
-		if ( strlen( $filename ) ) {
+		if ( $filename !== '' ) {
 			$parts[] = "filename*=UTF-8''" . rawurlencode( basename( $filename ) );
 		}
 
@@ -1739,7 +1756,7 @@ abstract class FileBackend implements LoggerAwareInterface {
 	 * @return StatusValue Modified status or StatusValue subclass
 	 */
 	final protected function wrapStatus( StatusValue $sv ) {
-		return $this->statusWrapper ? call_user_func( $this->statusWrapper, $sv ) : $sv;
+		return $this->statusWrapper ? ( $this->statusWrapper )( $sv ) : $sv;
 	}
 
 	/**

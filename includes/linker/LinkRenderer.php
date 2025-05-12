@@ -20,13 +20,13 @@
  */
 namespace MediaWiki\Linker;
 
-use HtmlArmor;
 use MediaWiki\Cache\LinkCache;
 use MediaWiki\Config\ServiceOptions;
 use MediaWiki\HookContainer\HookContainer;
 use MediaWiki\HookContainer\HookRunner;
 use MediaWiki\Html\Html;
 use MediaWiki\Language\Language;
+use MediaWiki\Linker\LinkTarget as MWLinkTarget;
 use MediaWiki\Message\Message;
 use MediaWiki\Page\PageReference;
 use MediaWiki\Parser\Parser;
@@ -36,6 +36,8 @@ use MediaWiki\Title\Title;
 use MediaWiki\Title\TitleFormatter;
 use MediaWiki\Title\TitleValue;
 use Wikimedia\Assert\Assert;
+use Wikimedia\HtmlArmor\HtmlArmor;
+use Wikimedia\Parsoid\Core\LinkTarget;
 
 /**
  * Class that generates HTML for internal links.
@@ -152,8 +154,6 @@ class LinkRenderer {
 
 	/**
 	 * True when the links will be rendered in an edit summary or log comment.
-	 *
-	 * @return bool
 	 */
 	public function isForComment(): bool {
 		// This option only exists to power a hack in Wikibase's onHtmlPageLinkRendererEnd hook.
@@ -189,7 +189,14 @@ class LinkRenderer {
 		}
 	}
 
-	private function runBeginHook( $target, &$text, &$extraAttribs, &$query ) {
+	/**
+	 * @param LinkTarget $target $target
+	 * @param string|HtmlArmor|null &$text
+	 * @param array &$extraAttribs
+	 * @param array &$query
+	 * @return string|null|void
+	 */
+	private function runBeginHook( $target, &$text, array &$extraAttribs, array &$query ) {
 		$ret = null;
 		if ( !$this->hookRunner->onHtmlPageLinkRendererBegin(
 			// @phan-suppress-next-line PhanTypeMismatchArgument Type mismatch on pass-by-ref args
@@ -370,7 +377,7 @@ class LinkRenderer {
 	 * @param string|HtmlArmor|Message $text Text of link; will be escaped if
 	 *  a string.
 	 * @param-taint $text escapes_html
-	 * @param LinkTarget $title LinkTarget object used for title specific link attributes
+	 * @param LinkTarget|PageReference $title Where the link is being rendered, used for title specific link attributes
 	 * @param-taint $title none
 	 * @param string $linktype Type of external link. Gets added to the classes
 	 * @param-taint $linktype escapes_html
@@ -379,16 +386,15 @@ class LinkRenderer {
 	 * @return string
 	 */
 	public function makeExternalLink(
-		string $url, $text, LinkTarget $title, $linktype = '', $attribs = []
+		string $url, $text, $title, $linktype = '', $attribs = []
 	) {
-		$class = 'external';
+		$attribs['class'] ??= [];
+		Html::addClass( $attribs['class'], 'external' );
 		if ( $linktype ) {
-			$class .= " $linktype";
+			Html::addClass( $attribs['class'], $linktype );
 		}
-		if ( isset( $attribs['class'] ) && $attribs['class'] ) {
-			$class .= " {$attribs['class']}";
-		}
-		$attribs['class'] = $class;
+		// Stringify attributes for hook compatibility
+		$attribs['class'] = Html::expandClassList( $attribs['class'] );
 
 		if ( $text instanceof Message ) {
 			$text = $text->escaped();
@@ -399,14 +405,10 @@ class LinkRenderer {
 		}
 
 		$newRel = Parser::getExternalLinkRel( $url, $title );
-		if ( !isset( $attribs['rel'] ) || $attribs['rel'] === '' ) {
-			$attribs['rel'] = $newRel;
-		} elseif ( $newRel !== null ) {
-			// Merge the rel attributes.
-			$newRels = explode( ' ', $newRel );
-			$oldRels = explode( ' ', $attribs['rel'] );
-			$combined = array_unique( array_merge( $newRels, $oldRels ) );
-			$attribs['rel'] = implode( ' ', $combined );
+		if ( $newRel !== null ) {
+			$attribs['rel'] ??= [];
+			Html::addClass( $attribs['rel'], $newRel );
+			$attribs['rel'] = Html::expandClassList( $attribs['rel'] );
 		}
 		$link = '';
 		$success = $this->hookRunner->onLinkerMakeExternalLink(
@@ -436,9 +438,13 @@ class LinkRenderer {
 	 * @param Language $lang
 	 * @param Title $target Destination to redirect
 	 * @param bool $forceKnown Should the image be shown as a bluelink regardless of existence?
+	 * @param bool $addLinkTag Should a <link> tag be added?
 	 * @return string Containing HTML with redirect link
 	 */
-	public function makeRedirectHeader( Language $lang, Title $target, bool $forceKnown = false ) {
+	public function makeRedirectHeader(
+		Language $lang, Title $target,
+		bool $forceKnown = false, bool $addLinkTag = false
+	) {
 		$html = '<ul class="redirectText">';
 		if ( $forceKnown ) {
 			$link = $this->makeKnownLink(
@@ -459,13 +465,17 @@ class LinkRenderer {
 		}
 
 		$redirectToText = wfMessage( 'redirectto' )->inLanguage( $lang )->escaped();
+		$linkTag = '';
+		if ( $addLinkTag ) {
+			$linkTag = Html::rawElement( 'link', [ 'rel' => 'mw:PageProp/redirect' ] );
+		}
 
 		return Html::rawElement(
 			'div', [ 'class' => 'redirectMsg' ],
 			Html::rawElement( 'p', [], $redirectToText ) .
 			Html::rawElement( 'ul', [ 'class' => 'redirectText' ],
 				Html::rawElement( 'li', [], $link ) )
-		);
+		) . $linkTag;
 	}
 
 	/**
@@ -536,9 +546,9 @@ class LinkRenderer {
 	 *
 	 * @internal For use by Linker::getImageLinkMTOParams()
 	 * @param LinkTarget|PageReference $target Page that will be visited when the user clicks on the link.
-	 * @return LinkTarget
+	 * @return MWLinkTarget
 	 */
-	public function normalizeTarget( $target ) {
+	public function normalizeTarget( $target ): MWLinkTarget {
 		$target = $this->castToLinkTarget( $target );
 		if ( $target->getNamespace() === NS_SPECIAL && !$target->isExternal() ) {
 			[ $name, $subpage ] = $this->specialPageFactory->resolveAlias(
@@ -626,13 +636,15 @@ class LinkRenderer {
 
 	/**
 	 * @param LinkTarget|PageReference $target Page that will be visited when the user clicks on the link.
-	 * @return LinkTarget
+	 * @return MWLinkTarget
 	 */
-	private function castToLinkTarget( $target ): LinkTarget {
+	private function castToLinkTarget( $target ): MWLinkTarget {
 		if ( $target instanceof PageReference ) {
 			return Title::newFromPageReference( $target );
 		}
-		// $target instanceof LinkTarget
-		return $target;
+		if ( $target instanceof MWLinkTarget ) {
+			return $target;
+		}
+		return TitleValue::newFromLinkTarget( $target );
 	}
 }

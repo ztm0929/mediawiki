@@ -15,9 +15,9 @@ class TaskRunner {
 	/** @var string */
 	private $profile;
 	/** @var callable[] */
-	private $taskStartListeners;
+	private $taskStartListeners = [];
 	/** @var callable[] */
-	private $taskEndListeners;
+	private $taskEndListeners = [];
 	/** @var array<string,bool> */
 	private $skippedTasks = [];
 	/** @var array<string,bool> */
@@ -164,8 +164,6 @@ class TaskRunner {
 	/**
 	 * Add a callback to be called before each task is executed. The callback
 	 * takes one parameter: the task object.
-	 *
-	 * @param callable $listener
 	 */
 	public function addTaskStartListener( callable $listener ) {
 		$this->taskStartListeners[] = $listener;
@@ -175,8 +173,6 @@ class TaskRunner {
 	 * Add a callback to be called after each task completes. The callback
 	 * takes two parameters: the task object and the Status returned by the
 	 * task.
-	 *
-	 * @param callable $listener
 	 */
 	public function addTaskEndListener( callable $listener ) {
 		$this->taskEndListeners[] = $listener;
@@ -203,8 +199,6 @@ class TaskRunner {
 
 	/**
 	 * Provide a summary of the tasks to be executed, for debugging.
-	 *
-	 * @return string
 	 */
 	public function dumpTaskList(): string {
 		$ret = '';
@@ -214,6 +208,7 @@ class TaskRunner {
 			if ( $task->isSkipped() ) {
 				$ret .= ' [SKIPPED]';
 			}
+			$ret .= ': ' . $task->getDescriptionMessage()->text();
 			$ret .= "\n";
 		}
 		return $ret;

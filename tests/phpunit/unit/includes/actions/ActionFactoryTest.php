@@ -1,7 +1,11 @@
 <?php
 
+use MediaWiki\Actions\Action;
 use MediaWiki\Actions\ActionFactory;
+use MediaWiki\Actions\EditAction;
+use MediaWiki\Actions\InfoAction;
 use MediaWiki\Context\IContextSource;
+use MediaWiki\Page\Article;
 use MediaWiki\Request\FauxRequest;
 use MediaWiki\Tests\Unit\DummyServicesTrait;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -27,7 +31,8 @@ class ActionFactoryTest extends MediaWikiUnitTestCase {
 				$overrides['actions'] ?? [],
 				$overrides['logger'] ?? new NullLogger(),
 				$this->getDummyObjectFactory(),
-				$this->createHookContainer( $hooks )
+				$this->createHookContainer( $hooks ),
+				$this->getDummyContentHandlerFactory()
 			] )
 			->onlyMethods( [ 'getArticle' ] )
 			->getMock();

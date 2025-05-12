@@ -21,12 +21,12 @@
 namespace MediaWiki\Maintenance;
 
 use Closure;
-use DeferredUpdates;
 use ExecutableFinder;
 use Generator;
 use MediaWiki;
 use MediaWiki\Config\Config;
 use MediaWiki\Debug\MWDebug;
+use MediaWiki\Deferred\DeferredUpdates;
 use MediaWiki\HookContainer\HookContainer;
 use MediaWiki\HookContainer\HookRunner;
 use MediaWiki\MainConfigNames;
@@ -488,16 +488,14 @@ abstract class Maintenance {
 	 * as we handle all --quiet stuff here
 	 * @stable to override
 	 * @param string $out The text to show to the user
-	 * @param mixed|null $channel Unique identifier for the channel. See function outputChanneled.
+	 * @param string|null $channel Unique identifier for the channel. See function outputChanneled.
 	 */
 	protected function output( $out, $channel = null ) {
 		// This is sometimes called very early, before Setup.php is included.
 		if ( defined( 'MW_SERVICE_BOOTSTRAP_COMPLETE' ) ) {
 			// Flush stats periodically in long-running CLI scripts to avoid OOM (T181385)
-			$stats = $this->getServiceContainer()->getStatsdDataFactory();
-			if ( $stats->getDataCount() > 1000 ) {
-				MediaWiki::emitBufferedStatsdData( $stats, $this->getConfig() );
-			}
+			$statsFactory = $this->getServiceContainer()->getStatsFactory();
+			MediaWiki::emitBufferedStats( $statsFactory );
 		}
 
 		if ( $this->mQuiet ) {
@@ -1206,6 +1204,8 @@ abstract class Maintenance {
 	/**
 	 * Commit the transaction on a DB handle and wait for replica DB servers to catch up
 	 *
+	 * This method also triggers {@link DeferredUpdates::tryOpportunisticExecute()}.
+	 *
 	 * Maintenance scripts should call this method instead of {@link IDatabase::commit()}.
 	 * Use of this method makes it clear that the caller is a maintenance script, which has
 	 * the outermost transaction scope needed to explicitly commit transactions.
@@ -1220,6 +1220,7 @@ abstract class Maintenance {
 	 */
 	protected function commitTransaction( IDatabase $dbw, $fname ) {
 		$dbw->commit( $fname );
+
 		return $this->waitForReplication();
 	}
 
@@ -1268,6 +1269,13 @@ abstract class Maintenance {
 		// If no config callback was configured, this has no effect.
 		$lbFactory->autoReconfigure();
 
+		// Periodically run any deferred updates that accumulate
+		DeferredUpdates::tryOpportunisticExecute();
+		// Flush stats periodically in long-running CLI scripts to avoid OOM (T181385)
+		MediaWikiEntryPoint::emitBufferedStats(
+			$this->getServiceContainer()->getStatsFactory()
+		);
+
 		return $waitSucceeded;
 	}
 
@@ -1298,6 +1306,8 @@ abstract class Maintenance {
 	 *
 	 * Use this method for scripts that split up their work into logical transactions.
 	 *
+	 * This method also triggers {@link DeferredUpdates::tryOpportunisticExecute()}.
+	 *
 	 * @see ILBfactory::commitPrimaryChanges()
 	 *
 	 * @param string $fname Caller name
@@ -1317,9 +1327,8 @@ abstract class Maintenance {
 		// Periodically run any deferred updates that accumulate
 		DeferredUpdates::tryOpportunisticExecute();
 		// Flush stats periodically in long-running CLI scripts to avoid OOM (T181385)
-		MediaWikiEntryPoint::emitBufferedStatsdData(
-			$this->getServiceContainer()->getStatsdDataFactory(),
-			$this->getConfig()
+		MediaWikiEntryPoint::emitBufferedStats(
+			$this->getServiceContainer()->getStatsFactory()
 		);
 
 		// If possible, apply changes to the database configuration.
@@ -1635,6 +1644,27 @@ abstract class Maintenance {
 		}
 
 		return $line;
+	}
+
+	/**
+	 * @param string $prompt The prompt to display to the user
+	 * @param bool|null $default The default value to return if the user just presses enter
+	 *
+	 * @return ?bool
+	 *
+	 * @since 1.44
+	 */
+	protected function promptYesNo( $prompt, $default = null ) {
+		$defaultText = $default === null ? '' : ( $default ? 'Y' : 'n' );
+		$line = self::readconsole( $prompt . " (Y/n) [$defaultText]" );
+		if ( $line === false ) {
+			return $default;
+		}
+		if ( $line === '' ) {
+			return $default;
+		}
+
+		return strtolower( $line ) === 'y';
 	}
 }
 

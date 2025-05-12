@@ -289,7 +289,6 @@ class DatabaseMySQLTest extends TestCase {
 		$replicationReporter->method( 'getServerId' )->willReturn( 1 );
 		$replicationReporter->method( 'getServerUUID' )->willReturn( '2E11FA47-71CA-11E1-9E33-C80AA9429562' );
 
-		/** @var MysqlReplicationReporter $replicationReporter */
 		if ( is_array( $rGTIDs ) ) {
 			$this->assertEquals( $rGTIDs, $replicationReporter->getReplicaPos( $db )->getGTIDs() );
 		} else {
@@ -542,6 +541,20 @@ class DatabaseMySQLTest extends TestCase {
 
 		/** @var IDatabase $db */
 		$db->setTableAliases( [
+			'meow' => [ 'dbname' => 'feline', 'schema' => null, 'prefix' => '' ]
+		] );
+		$sql = $db->newSelectQueryBuilder()
+			->select( 'field' )
+			->from( 'meow' )
+			->where( [ 'a' => 'x' ] )
+			->caller( __METHOD__ )->getSQL();
+
+		$this->assertSameSql(
+			"SELECT  field  FROM `feline`.`meow` `meow`    WHERE a = 'x'  ",
+			$sql
+		);
+
+		$db->setTableAliases( [
 			'meow' => [ 'dbname' => 'feline', 'schema' => null, 'prefix' => 'cat_' ]
 		] );
 		$sql = $db->newSelectQueryBuilder()
@@ -551,7 +564,7 @@ class DatabaseMySQLTest extends TestCase {
 			->caller( __METHOD__ )->getSQL();
 
 		$this->assertSameSql(
-			"SELECT  field  FROM `feline`.`cat_meow`    WHERE a = 'x'  ",
+			"SELECT  field  FROM `feline`.`cat_meow` `meow`    WHERE a = 'x'  ",
 			$sql
 		);
 
@@ -582,7 +595,6 @@ class DatabaseMySQLTest extends TestCase {
 		$wdb = TestingAccessWrapper::newFromObject( $db );
 		$wdb->platform = new MySQLPlatform( new AddQuoterMock() );
 
-		/** @var IDatabase $db */
 		$sql = $wdb->selectSQLText( 'image',
 			'img_metadata',
 			'*',

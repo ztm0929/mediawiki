@@ -2,6 +2,7 @@
 
 use Composer\Semver\VersionParser;
 use MediaWiki\Json\FormatJson;
+use MediaWiki\Maintenance\Maintenance;
 use MediaWiki\Registration\ExtensionRegistry;
 
 // @codeCoverageIgnoreStart
@@ -83,7 +84,7 @@ class UpdateExtensionJsonSchema extends Maintenance {
 		}
 	}
 
-	protected function updateTo2( &$json ) {
+	protected function updateTo2( array &$json ) {
 		if ( isset( $json['config'] ) ) {
 			$config = $json['config'];
 			$json['config'] = [];

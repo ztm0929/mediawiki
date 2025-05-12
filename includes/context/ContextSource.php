@@ -24,18 +24,18 @@ use MediaWiki\Config\Config;
 use MediaWiki\Language\Language;
 use MediaWiki\Message\Message;
 use MediaWiki\Output\OutputPage;
+use MediaWiki\Page\WikiPage;
 use MediaWiki\Permissions\Authority;
 use MediaWiki\Request\WebRequest;
 use MediaWiki\Session\CsrfTokenSet;
+use MediaWiki\Skin\Skin;
 use MediaWiki\Title\Title;
 use MediaWiki\User\User;
-use Skin;
-use Timing;
 use Wikimedia\Bcp47Code\Bcp47Code;
 use Wikimedia\Message\MessageParam;
 use Wikimedia\Message\MessageSpecifier;
 use Wikimedia\NonSerializable\NonSerializableTrait;
-use WikiPage;
+use Wikimedia\Timing\Timing;
 
 /**
  * The simplest way of implementing IContextSource is to hold a RequestContext as a

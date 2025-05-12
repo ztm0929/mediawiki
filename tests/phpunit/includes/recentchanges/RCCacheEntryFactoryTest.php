@@ -1,10 +1,13 @@
 <?php
 
 use MediaWiki\Linker\LinkRenderer;
+use MediaWiki\Linker\UserLinkRenderer;
+use MediaWiki\RecentChanges\RCCacheEntry;
+use MediaWiki\RecentChanges\RCCacheEntryFactory;
 use MediaWiki\Title\Title;
 
 /**
- * @covers \RCCacheEntryFactory
+ * @covers \MediaWiki\RecentChanges\RCCacheEntryFactory
  * @group Database
  * @author Katie Filbert <aude.wiki@gmail.com>
  */
@@ -20,10 +23,13 @@ class RCCacheEntryFactoryTest extends MediaWikiLangTestCase {
 	 */
 	private $linkRenderer;
 
+	private UserLinkRenderer $userLinkRenderer;
+
 	protected function setUp(): void {
 		parent::setUp();
 
 		$this->linkRenderer = $this->getServiceContainer()->getLinkRenderer();
+		$this->userLinkRenderer = $this->getServiceContainer()->getUserLinkRenderer();
 		$this->testRecentChangesHelper = new TestRecentChangesHelper();
 	}
 
@@ -42,7 +48,8 @@ class RCCacheEntryFactoryTest extends MediaWikiLangTestCase {
 		$cacheEntryFactory = new RCCacheEntryFactory(
 			$this->getContext(),
 			$this->getMessages(),
-			$this->linkRenderer
+			$this->linkRenderer,
+			$this->userLinkRenderer
 		);
 		$cacheEntry = $cacheEntryFactory->newFromRecentChange( $recentChange, false );
 
@@ -77,7 +84,8 @@ class RCCacheEntryFactoryTest extends MediaWikiLangTestCase {
 		$cacheEntryFactory = new RCCacheEntryFactory(
 			$this->getContext(),
 			$this->getMessages(),
-			$this->linkRenderer
+			$this->linkRenderer,
+			$this->userLinkRenderer
 		);
 		$cacheEntry = $cacheEntryFactory->newFromRecentChange( $recentChange, false );
 
@@ -111,7 +119,8 @@ class RCCacheEntryFactoryTest extends MediaWikiLangTestCase {
 		$cacheEntryFactory = new RCCacheEntryFactory(
 			$this->getContext(),
 			$this->getMessages(),
-			$this->linkRenderer
+			$this->linkRenderer,
+			$this->userLinkRenderer
 		);
 		$cacheEntry = $cacheEntryFactory->newFromRecentChange( $recentChange, false );
 

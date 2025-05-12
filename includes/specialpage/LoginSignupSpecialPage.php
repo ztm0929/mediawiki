@@ -23,9 +23,7 @@
 
 namespace MediaWiki\SpecialPage;
 
-use ErrorPageError;
 use Exception;
-use FatalError;
 use LogicException;
 use LoginHelper;
 use MediaWiki\Auth\AuthenticationRequest;
@@ -35,6 +33,10 @@ use MediaWiki\Auth\PasswordAuthenticationRequest;
 use MediaWiki\Auth\UsernameAuthenticationRequest;
 use MediaWiki\Context\DerivativeContext;
 use MediaWiki\Context\RequestContext;
+use MediaWiki\Exception\ErrorPageError;
+use MediaWiki\Exception\FatalError;
+use MediaWiki\Exception\PermissionsError;
+use MediaWiki\Exception\ReadOnlyError;
 use MediaWiki\Html\Html;
 use MediaWiki\HTMLForm\HTMLForm;
 use MediaWiki\Language\RawMessage;
@@ -44,13 +46,11 @@ use MediaWiki\MediaWikiServices;
 use MediaWiki\Message\Message;
 use MediaWiki\Parser\Sanitizer;
 use MediaWiki\Session\SessionManager;
+use MediaWiki\Skin\Skin;
 use MediaWiki\Status\Status;
 use MediaWiki\Title\Title;
 use MediaWiki\User\User;
 use MediaWiki\User\UserIdentity;
-use PermissionsError;
-use ReadOnlyError;
-use Skin;
 use StatusValue;
 use Wikimedia\ScopedCallback;
 
@@ -166,7 +166,7 @@ abstract class LoginSignupSpecialPage extends AuthManagerSpecialPage {
 		$this->mReturnTo = $request->getVal( 'returnto', '' );
 		$this->mReturnToQuery = $request->getVal( 'returntoquery', '' );
 		$this->mReturnToAnchor = $request->getVal( 'returntoanchor', '' );
-		if ( $request->getVal( 'display' ) === 'popup' ) {
+		if ( $request->getRawVal( 'display' ) === 'popup' ) {
 			$this->mDisplay = 'popup';
 		}
 	}
@@ -271,7 +271,7 @@ abstract class LoginSignupSpecialPage extends AuthManagerSpecialPage {
 			$params['display'] = $this->mDisplay;
 		}
 
-		return array_filter( $params, fn ( $val ) => $val !== null );
+		return array_filter( $params, static fn ( $val ) => $val !== null );
 	}
 
 	protected function beforeExecute( $subPage ) {
@@ -282,7 +282,6 @@ abstract class LoginSignupSpecialPage extends AuthManagerSpecialPage {
 
 	/**
 	 * @param string|null $subPage
-	 * @suppress PhanTypeObjectUnsetDeclaredProperty
 	 */
 	public function execute( $subPage ) {
 		if ( $this->mPosted ) {
@@ -299,6 +298,9 @@ abstract class LoginSignupSpecialPage extends AuthManagerSpecialPage {
 
 		$authManager = MediaWikiServices::getInstance()->getAuthManager();
 		$session = SessionManager::getGlobalSession();
+
+		// Before persisting, set the login token to avoid double writes
+		$this->getToken();
 
 		// Session data is used for various things in the authentication process, so we must make
 		// sure a session cookie or some equivalent mechanism is set.
@@ -452,7 +454,7 @@ abstract class LoginSignupSpecialPage extends AuthManagerSpecialPage {
 			case AuthenticationResponse::FAIL:
 				// fall through
 			case AuthenticationResponse::RESTART:
-				unset( $this->authForm );
+				$this->authForm = null;
 				if ( $response->status === AuthenticationResponse::FAIL ) {
 					$action = $this->getDefaultAction( $subPage );
 					$messageType = 'error';
@@ -465,11 +467,11 @@ abstract class LoginSignupSpecialPage extends AuthManagerSpecialPage {
 				$this->mainLoginForm( $this->authRequests, $response->message, $messageType );
 				break;
 			case AuthenticationResponse::REDIRECT:
-				unset( $this->authForm );
+				$this->authForm = null;
 				$this->getOutput()->redirect( $response->redirectTarget );
 				break;
 			case AuthenticationResponse::UI:
-				unset( $this->authForm );
+				$this->authForm = null;
 				$this->authAction = $this->isSignup() ? AuthManager::ACTION_CREATE_CONTINUE
 					: AuthManager::ACTION_LOGIN_CONTINUE;
 				$this->authRequests = $response->neededRequests;
@@ -583,7 +585,8 @@ abstract class LoginSignupSpecialPage extends AuthManagerSpecialPage {
 
 		// Generic styles and scripts for both login and signup form
 		$out->addModuleStyles( [
-			'mediawiki.special.userlogin.common.styles'
+			'mediawiki.special.userlogin.common.styles',
+			'mediawiki.codex.messagebox.styles'
 		] );
 		if ( $this->isSignup() ) {
 			// Additional styles and scripts for signup form
@@ -774,7 +777,7 @@ abstract class LoginSignupSpecialPage extends AuthManagerSpecialPage {
 	protected function getAuthForm( array $requests, $action ) {
 		// FIXME merge this with parent
 
-		if ( isset( $this->authForm ) ) {
+		if ( $this->authForm ) {
 			return $this->authForm;
 		}
 
@@ -1272,18 +1275,24 @@ abstract class LoginSignupSpecialPage extends AuthManagerSpecialPage {
 	 * @return string
 	 */
 	protected function makeLanguageSelectorLink( $text, $lang ) {
-		if ( $this->getLanguage()->getCode() == $lang ) {
+		$services = MediaWikiServices::getInstance();
+
+		if ( $this->getLanguage()->getCode() == $lang
+			|| !$services->getLanguageNameUtils()->isValidCode( $lang )
+		) {
 			// no link for currently used language
+			// or invalid language code
 			return htmlspecialchars( $text );
 		}
+
 		$query = $this->getPreservedParams();
 		$query['uselang'] = $lang;
 
 		$attr = [];
-		$targetLanguage = MediaWikiServices::getInstance()->getLanguageFactory()
-			->getLanguage( $lang );
+		$targetLanguage = $services->getLanguageFactory()->getLanguage( $lang );
 		$attr['lang'] = $attr['hreflang'] = $targetLanguage->getHtmlCode();
 		$attr['class'] = 'mw-authentication-popup-link';
+		$attr['title'] = false;
 
 		return $this->getLinkRenderer()->makeKnownLink(
 			$this->getPageTitle(),

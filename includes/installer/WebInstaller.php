@@ -24,15 +24,17 @@
 namespace MediaWiki\Installer;
 
 use Exception;
-use HtmlArmor;
 use MediaWiki\Context\RequestContext;
 use MediaWiki\Html\Html;
+use MediaWiki\Installer\Task\TaskFactory;
+use MediaWiki\Installer\Task\TaskList;
+use MediaWiki\Installer\Task\TaskRunner;
 use MediaWiki\Languages\LanguageNameUtils;
 use MediaWiki\MediaWikiServices;
 use MediaWiki\Message\Message;
 use MediaWiki\Request\WebRequest;
 use MediaWiki\Status\Status;
-use MediaWiki\Xml\Xml;
+use Wikimedia\HtmlArmor\HtmlArmor;
 
 /**
  * Class for the core installer web interface.
@@ -148,9 +150,6 @@ class WebInstaller extends Installer {
 	 */
 	protected $currentPageName;
 
-	/**
-	 * @param WebRequest $request
-	 */
 	public function __construct( WebRequest $request ) {
 		parent::__construct();
 		$this->output = new WebInstallerOutput( $this );
@@ -627,23 +626,6 @@ class WebInstaller extends Installer {
 	}
 
 	/**
-	 * Get HTML for an information message box with an icon.
-	 *
-	 * @param string|HtmlArmor $text Wikitext to be parsed (from Message::plain) or raw HTML.
-	 * @param string|false $icon Icon name, file in mw-config/images. Default: false
-	 * @param string $class Additional class name to add to the wrapper div. Default: Empty string.
-	 * @return string HTML
-	 */
-	public function getInfoBox( $text, $icon = false, $class = '' ) {
-		$html = ( $text instanceof HtmlArmor ) ?
-			HtmlArmor::getHtml( $text ) :
-			$this->parse( $text, true );
-		$alt = wfMessage( 'config-information' )->text();
-
-		return self::infoBox( $html, '', $alt, $class );
-	}
-
-	/**
 	 * Get small text indented help for a preceding form field.
 	 * Parameters like wfMessage().
 	 *
@@ -667,8 +649,41 @@ class WebInstaller extends Installer {
 			"</div>\n";
 	}
 
+	/**
+	 * Get HTML for an information message box.
+	 *
+	 * @param string|HtmlArmor $text Wikitext to be parsed (from Message::plain) or raw HTML.
+	 * @return string HTML
+	 */
+	public function getInfoBox( $text ) {
+		$html = ( $text instanceof HtmlArmor ) ?
+			HtmlArmor::getHtml( $text ) :
+			$this->parse( $text, true );
+		return '<div class="cdx-message cdx-message--block cdx-message--notice">' .
+			'<span class="cdx-message__icon"></span><div class="cdx-message__content">' .
+			'<p><strong>' . wfMessage( 'config-information' )->escaped() . '</strong></p>' .
+			$html .
+			"</div></div>\n";
+	}
+
+	public function showSuccess( $msg, ...$params ) {
+		$html = '<div class="cdx-message cdx-message--block cdx-message--success">' .
+			'<span class="cdx-message__icon"></span><div class="cdx-message__content">' .
+			$this->parse( wfMessage( $msg, $params )->useDatabase( false )->plain() ) .
+			"</div></div>\n";
+		$this->output->addHTML( $html );
+	}
+
 	public function showMessage( $msg, ...$params ) {
 		$html = '<div class="cdx-message cdx-message--block cdx-message--notice">' .
+			'<span class="cdx-message__icon"></span><div class="cdx-message__content">' .
+			$this->parse( wfMessage( $msg, $params )->useDatabase( false )->plain() ) .
+			"</div></div>\n";
+		$this->output->addHTML( $html );
+	}
+
+	public function showWarning( $msg, ...$params ) {
+		$html = '<div class="cdx-message cdx-message--block cdx-message--warning">' .
 			'<span class="cdx-message__icon"></span><div class="cdx-message__content">' .
 			$this->parse( wfMessage( $msg, $params )->useDatabase( false )->plain() ) .
 			"</div></div>\n";
@@ -678,10 +693,10 @@ class WebInstaller extends Installer {
 	public function showStatusMessage( Status $status ) {
 		// Show errors at the top in web installer to make them easier to notice
 		foreach ( $status->getMessages( 'error' ) as $msg ) {
-			$this->showMessage( $msg );
+			$this->showWarning( $msg );
 		}
 		foreach ( $status->getMessages( 'warning' ) as $msg ) {
-			$this->showMessage( $msg );
+			$this->showWarning( $msg );
 		}
 	}
 
@@ -711,7 +726,7 @@ class WebInstaller extends Installer {
 
 		return "<div class=\"config-block\">\n" .
 			"  <div class=\"config-block-label\">\n" .
-			Xml::tags( 'label',
+			Html::rawElement( 'label',
 				$attributes,
 				$labelText
 			) . "\n" .
@@ -758,12 +773,13 @@ class WebInstaller extends Installer {
 			$params['label'],
 			$params['controlName'],
 			"<div class=\"cdx-text-input\">" .
-			Xml::input(
+			Html::input(
 				$params['controlName'],
-				30, // intended to be overridden by CSS
 				$params['value'],
+				'text',
 				$params['attribs'] + [
 					'id' => $params['controlName'],
+					'size' => 30, // intended to be overridden by CSS
 					'class' => 'cdx-text-input__input',
 					'tabindex' => $this->nextTabIndex()
 				]
@@ -805,13 +821,13 @@ class WebInstaller extends Installer {
 		return $this->label(
 			$params['label'],
 			$params['controlName'],
-			Xml::textarea(
+			Html::textarea(
 				$params['controlName'],
 				$params['value'],
-				30,
-				5,
 				$params['attribs'] + [
 					'id' => $params['controlName'],
+					'cols' => 30,
+					'rows' => 5,
 					'class' => 'config-input-text',
 					'tabindex' => $this->nextTabIndex()
 				]
@@ -852,21 +868,6 @@ class WebInstaller extends Installer {
 	}
 
 	/**
-	 * Add a class to an array of attributes. If the array already has a class,
-	 * append the new class to the list.
-	 *
-	 * @param array &$attribs
-	 * @param string $class
-	 */
-	private static function addClassAttrib( &$attribs, $class ) {
-		if ( isset( $attribs['class'] ) ) {
-			$attribs['class'] .= ' ' . $class;
-		} else {
-			$attribs['class'] = $class;
-		}
-	}
-
-	/**
 	 * Get a labelled checkbox to configure a boolean variable.
 	 *
 	 * @param mixed[] $params
@@ -901,11 +902,13 @@ class WebInstaller extends Installer {
 			$params['labelAttribs'] = [];
 		}
 		$labelText = $params['rawtext'] ?? $this->parse( wfMessage( $params['label'] )->plain() );
-		self::addClassAttrib( $params['attribs'], 'cdx-checkbox__input' );
-		self::addClassAttrib( $params['labelAttribs'], 'cdx-checkbox__label' );
+		$labelText = '<span class="cdx-label__label__text"> ' . $labelText . '</span>';
+		Html::addClass( $params['attribs']['class'], 'cdx-checkbox__input' );
+		Html::addClass( $params['labelAttribs']['class'], 'cdx-label__label' );
 
-		return "<div class=\"cdx-checkbox\" style=\"margin-top: 12px; margin-bottom: 2px;\">\n" .
-			Xml::check(
+		return "<div class=\"cdx-checkbox\" style=\"margin-top: 12px; margin-bottom: 2px;\">" .
+			"<div class=\"cdx-checkbox__wrapper\">\n" .
+			Html::check(
 				$params['controlName'],
 				$params['value'],
 				$params['attribs'] + [
@@ -914,6 +917,7 @@ class WebInstaller extends Installer {
 				]
 			) .
 			"<span class=\"cdx-checkbox__icon\"></span>" .
+			"<div class=\"cdx-checkbox__label cdx-label\">" .
 			Html::rawElement(
 				'label',
 				$params['labelAttribs'] + [
@@ -921,7 +925,7 @@ class WebInstaller extends Installer {
 				],
 				$labelText
 				) .
-			"</div>\n" . $params['help'];
+			"</div></div></div>\n" . $params['help'];
 	}
 
 	/**
@@ -1000,17 +1004,24 @@ class WebInstaller extends Installer {
 			$id = $params['controlName'] . '_' . $value;
 			$itemAttribs['id'] = $id;
 			$itemAttribs['tabindex'] = $this->nextTabIndex();
-			self::addClassAttrib( $itemAttribs, 'cdx-radio__input' );
+			Html::addClass( $itemAttribs['class'], 'cdx-radio__input' );
 
+			$radioText = $this->parse(
+				isset( $params['itemLabels'] ) ?
+					wfMessage( $params['itemLabels'][$value] )->plain() :
+					wfMessage( $params['itemLabelPrefix'] . strtolower( $value ) )->plain()
+			);
 			$items[$value] =
 				'<span class="cdx-radio">' .
-				Xml::radio( $params['controlName'], $value, $checked, $itemAttribs ) .
-				"<span class=\"cdx-radio__icon\"></span>\u{00A0}" .
-				Xml::tags( 'label', [ 'for' => $id, 'class' => 'cdx-radio__label' ], $this->parse(
-					isset( $params['itemLabels'] ) ?
-						wfMessage( $params['itemLabels'][$value] )->plain() :
-						wfMessage( $params['itemLabelPrefix'] . strtolower( $value ) )->plain()
-				) ) . '</span>';
+				'<span class="cdx-radio__wrapper">' .
+				Html::radio( $params['controlName'], $checked, $itemAttribs + [ 'value' => $value ] ) .
+				'<span class="cdx-radio__icon"></span>' .
+				'<span class="cdx-radio__label cdx-label">' .
+				Html::rawElement(
+					'label',
+					[ 'for' => $id, 'class' => 'cdx-label__label' ],
+					'<span class="cdx-label__label__text">' . $radioText . '</span>'
+				) . '</span></span></span>';
 		}
 
 		return $items;
@@ -1101,21 +1112,6 @@ class WebInstaller extends Installer {
 	}
 
 	/**
-	 * Helper for "Download LocalSettings" link.
-	 *
-	 * @internal For use in WebInstallerComplete class
-	 * @return string Html for download link
-	 */
-	public function makeDownloadLinkHtml() {
-		$anchor = Html::rawElement( 'a',
-			[ 'href' => $this->getUrl( [ 'localsettings' => 1 ] ) ],
-			wfMessage( 'config-download-localsettings' )->parse()
-		);
-
-		return Html::rawElement( 'div', [ 'class' => 'config-download-link' ], $anchor );
-	}
-
-	/**
 	 * If the software package wants the LocalSettings.php file
 	 * to be placed in a specific location, override this function
 	 * (see mw-config/overrides/README) to return the path of
@@ -1189,6 +1185,13 @@ class WebInstaller extends Installer {
 	}
 
 	/**
+	 * @return string
+	 */
+	public function getDefaultServer() {
+		return $this->envGetDefaultServer();
+	}
+
+	/**
 	 * Actually output LocalSettings.php for download
 	 */
 	private function outputLS() {
@@ -1221,34 +1224,6 @@ class WebInstaller extends Installer {
 	}
 
 	/**
-	 * Get HTML for an information message box with an icon.
-	 *
-	 * @since 1.36
-	 * @param string $rawHtml HTML
-	 * @param string $icon Path to icon file (used as 'src' attribute)
-	 * @param string $alt Alternate text for the icon
-	 * @param string $class Additional class name to add to the wrapper div
-	 * @return string HTML
-	 */
-	protected static function infoBox( $rawHtml, $icon, $alt, $class = '' ) {
-		$s = Html::openElement( 'div', [ 'class' => 'mw-installer-box-left' ] ) .
-			Html::element( 'img',
-				[
-					'src' => $icon,
-					'alt' => $alt,
-				]
-			) .
-			Html::closeElement( 'div' ) .
-			Html::openElement( 'div', [ 'class' => 'mw-installer-box-right' ] ) .
-			$rawHtml .
-			Html::closeElement( 'div' ) .
-			Html::element( 'div', [ 'style' => 'clear: left;' ], ' ' );
-
-		return Html::warningBox( $s, $class )
-			. Html::element( 'div', [ 'style' => 'clear: left;' ], ' ' );
-	}
-
-	/**
 	 * Determine whether the current database needs to be upgraded, i.e. whether
 	 * it already has MediaWiki tables.
 	 *
@@ -1266,15 +1241,16 @@ class WebInstaller extends Installer {
 	public function doUpgrade() {
 		$dbInstaller = $this->getDBInstaller();
 		$dbInstaller->preUpgrade();
-		$this->restoreServices();
 
-		$ret = true;
+		$taskList = new TaskList;
+		$taskFactory = $this->getTaskFactory();
+		$taskFactory->registerWebUpgradeTasks( $taskList );
+		$taskRunner = new TaskRunner( $taskList, $taskFactory, TaskFactory::PROFILE_WEB_UPGRADE );
+
 		ob_start( [ $this, 'outputHandler' ] );
-		$up = DatabaseUpdater::newForDB(
-			$dbInstaller->definitelyGetConnection( DatabaseInstaller::CONN_CREATE_TABLES ) );
 		try {
-			$up->doUpdates();
-			$up->purgeCache();
+			$status = $taskRunner->execute();
+			$ret = $status->isOK();
 
 			$this->setVar( '_UpgradeDone', true );
 		} catch ( Exception $e ) {

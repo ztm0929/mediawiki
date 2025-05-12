@@ -42,13 +42,9 @@ module.exports = exports = defineComponent( {
 	name: 'BlockDetailsField',
 	components: { CdxCheckbox, CdxField },
 	setup() {
-		const {
-			createAccount,
-			disableEmail,
-			disableEmailVisible,
-			disableUTEdit,
-			disableUTEditVisible
-		} = storeToRefs( useBlockStore() );
+		const store = useBlockStore();
+		const { createAccount, disableEmail, disableUTEdit, disableUTEditVisible } = storeToRefs( store );
+		const disableEmailVisible = mw.config.get( 'blockDisableEmailVisible' ) || false;
 		return {
 			createAccount,
 			disableEmail,

@@ -95,7 +95,9 @@ class PHPUnitMaintClass {
 			// or when T227900 is resolved.
 			$args[] = '--configuration=' . __DIR__ . '/suite.xml';
 		}
-		$args[] = '--bootstrap=' . __DIR__ . '/bootstrap.maintenance.php';
+		if ( !isset( $knownOpts['bootstrap'] ) ) {
+			$args[] = '--bootstrap=' . __DIR__ . '/bootstrap.maintenance.php';
+		}
 		$command->run( $args, true );
 	}
 }
@@ -160,11 +162,6 @@ require_once "$IP/includes/Setup.php";
 // stays in tact. Needs to happen after including Setup.php, which calls MWExceptionHandler::installHandle().
 restore_error_handler();
 
-// Check that composer dependencies are up-to-date
-if ( !getenv( 'MW_SKIP_EXTERNAL_DEPENDENCIES' ) ) {
-	$composerLockUpToDate = new CheckComposerLockUpToDate();
-	$composerLockUpToDate->loadParamsAndArgs( 'phpunit', [ 'quiet' => true ] );
-	$composerLockUpToDate->execute();
-}
+TestSetup::maybeCheckComposerLockUpToDate();
 
 $wrapper->execute();

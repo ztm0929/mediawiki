@@ -1,9 +1,11 @@
 <?php
 
+use MediaWiki\Actions\Action;
 use MediaWiki\Actions\ActionFactory;
 use MediaWiki\Context\IContextSource;
 use MediaWiki\Context\RequestContext;
 use MediaWiki\MediaWikiServices;
+use MediaWiki\Page\Article;
 use MediaWiki\Title\Title;
 use Psr\Log\NullLogger;
 
@@ -47,7 +49,8 @@ class ActionFactoryIntegrationTest extends MediaWikiIntegrationTestCase {
 				],
 				new NullLogger(),
 				$this->getServiceContainer()->getObjectFactory(),
-				$this->createHookContainer()
+				$this->createHookContainer(),
+				$this->getServiceContainer()->getContentHandlerFactory()
 			] )
 			->onlyMethods( [ 'getArticle' ] )
 			->getMock();

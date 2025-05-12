@@ -19,13 +19,14 @@
  */
 namespace MediaWiki\Rest\Handler\Helper;
 
-use HttpError;
 use InvalidArgumentException;
 use MediaWiki\Content\Content;
 use MediaWiki\Content\IContentHandlerFactory;
 use MediaWiki\Edit\ParsoidOutputStash;
 use MediaWiki\Edit\ParsoidRenderID;
 use MediaWiki\Edit\SelserContext;
+use MediaWiki\Exception\HttpError;
+use MediaWiki\Exception\MWUnknownContentModelException;
 use MediaWiki\Language\LanguageCode;
 use MediaWiki\Languages\LanguageFactory;
 use MediaWiki\Logger\LoggerFactory;
@@ -52,7 +53,6 @@ use MediaWiki\Revision\RevisionRenderer;
 use MediaWiki\Revision\SlotRecord;
 use MediaWiki\Status\Status;
 use MediaWiki\Title\Title;
-use MWUnknownContentModelException;
 use Wikimedia\Assert\Assert;
 use Wikimedia\Bcp47Code\Bcp47Code;
 use Wikimedia\Bcp47Code\Bcp47CodeValue;
@@ -294,18 +294,6 @@ class HtmlOutputRendererHelper implements HtmlOutputHelper {
 	}
 
 	/**
-	 * Controls how the parser cache is used.
-	 *
-	 * @param bool $read Whether we should look for cached output before parsing
-	 * @param bool $write Whether we should cache output after parsing
-	 */
-	public function setUseParserCache( bool $read, bool $write ) {
-		$this->parserOutputAccessOptions =
-			( $read ? 0 : ParserOutputAccess::OPT_FORCE_PARSE ) |
-			( $write ? 0 : ParserOutputAccess::OPT_NO_UPDATE_CACHE );
-	}
-
-	/**
 	 * Determine whether stashing should be applied.
 	 *
 	 * @param bool $stash
@@ -428,6 +416,12 @@ class HtmlOutputRendererHelper implements HtmlOutputHelper {
 		$this->initInternal( $page, $parameters, $authority, $revision );
 	}
 
+	/**
+	 * @param PageIdentity $page
+	 * @param array $parameters
+	 * @param Authority $authority
+	 * @param int|RevisionRecord|null $revision
+	 */
 	private function initInternal(
 		PageIdentity $page,
 		array $parameters,
@@ -577,10 +571,44 @@ class HtmlOutputRendererHelper implements HtmlOutputHelper {
 		return "\"{$eTag}\"";
 	}
 
+	private function isLatest(): bool {
+		$revId = $this->getRevisionId();
+
+		if ( $revId === null ) {
+			return false; // un-saved revision
+		}
+
+		if ( $revId === 0 ) {
+			return true; // latest revision
+		}
+
+		$page = $this->getPageRecord();
+
+		if ( !$page ) {
+			return false; // page doesn't exist. shouldn't happen.
+		}
+
+		return $revId === $page->getLatest();
+	}
+
 	/**
 	 * @inheritDoc
 	 */
 	public function getLastModified(): ?string {
+		if ( $this->isLatest() ) {
+			$page = $this->getPageRecord();
+
+			// $page should never be null here.
+			// If it's null, getParserOutput() will fail nicely below.
+			if ( $page ) {
+				// Using the touch timestamp for this purpose is in line with
+				// the behavior of ViewAction::show(). However,
+				// OutputPage::checkLastModified() applies a lot of additional
+				// limitations.
+				return $page->getTouched();
+			}
+		}
+
 		return $this->getParserOutput()->getCacheTime();
 	}
 
@@ -619,9 +647,6 @@ class HtmlOutputRendererHelper implements HtmlOutputHelper {
 		return $title->getPageLanguage();
 	}
 
-	/**
-	 * @return ParserOutput
-	 */
 	private function getParserOutput(): ParserOutput {
 		if ( !$this->parserOutput ) {
 			$this->parserOptions->setRenderReason( __METHOD__ );
@@ -732,8 +757,6 @@ class HtmlOutputRendererHelper implements HtmlOutputHelper {
 
 	/**
 	 * Returns the rendered HTML as a PageBundle object.
-	 *
-	 * @return PageBundle
 	 */
 	public function getPageBundle(): PageBundle {
 		// XXX: converting between PageBundle and ParserOutput is inefficient!
@@ -762,8 +785,6 @@ class HtmlOutputRendererHelper implements HtmlOutputHelper {
 	 *
 	 * This wil return null if RevisionRecord has been set but that RevisionRecord
 	 * does not have a revision ID, e.g. when rendering a preview.
-	 *
-	 * @return ?int
 	 */
 	public function getRevisionId(): ?int {
 		if ( !$this->revisionOrId ) {
@@ -771,7 +792,7 @@ class HtmlOutputRendererHelper implements HtmlOutputHelper {
 			return 0;
 		}
 
-		if ( is_object( $this->revisionOrId ) ) {
+		if ( $this->revisionOrId instanceof RevisionRecord ) {
 			// NOTE: return null even if getId() gave us 0
 			return $this->revisionOrId->getId() ?: null;
 		}
@@ -786,8 +807,6 @@ class HtmlOutputRendererHelper implements HtmlOutputHelper {
 	 * TODO: Should we move this to Parsoid's ContentUtils class?
 	 * There already is a stripUnnecessaryWrappersAndSyntheticNodes but
 	 * it targets html2wt and does a lot more than just section unwrapping.
-	 *
-	 * @param Element $elt
 	 */
 	private function stripParsoidSectionTags( Element $elt ): void {
 		$n = $elt->firstChild;
@@ -810,8 +829,27 @@ class HtmlOutputRendererHelper implements HtmlOutputHelper {
 	}
 
 	/**
-	 * @return Status
+	 * Returns the page record, or null if no page is known or the page does not exist.
+	 *
+	 * @return PageRecord|null
 	 */
+	private function getPageRecord(): ?PageRecord {
+		if ( $this->page === null ) {
+			return null;
+		}
+
+		if ( !$this->page instanceof PageRecord ) {
+			$page = $this->pageLookup->getPageByReference( $this->page );
+			if ( !$page ) {
+				return null;
+			}
+
+			$this->page = $page;
+		}
+
+		return $this->page;
+	}
+
 	private function getParserOutputInternal(): Status {
 		// NOTE: ParserOutputAccess::getParserOutput() should be used for revisions
 		//       that come from the database. Either this revision is null to indicate
@@ -830,29 +868,28 @@ class HtmlOutputRendererHelper implements HtmlOutputHelper {
 		// either directly or through ParserOutputAccess.
 
 		$flags = $this->parserOutputAccessOptions;
-		// Resolve revision
-		$page = $this->page;
+
+		// Find page
+		$pageRecord = $this->getPageRecord();
 		$revision = $this->revisionOrId;
-		if ( $page === null ) {
-			throw new RevisionAccessException( "No page" );
-		}
+
 		// NOTE: If we have a RevisionRecord already and this is
 		//       not cacheable, just use it, there is no need to
 		//       resolve $page to a PageRecord (and it may not be
 		//       possible if the page doesn't exist).
-		if ( $this->isCacheable || !$revision instanceof RevisionRecord ) {
-			if ( !$page instanceof PageRecord ) {
-				$name = "$page";
-				$page = $this->pageLookup->getPageByReference( $page );
-				if ( !$page ) {
+		if ( $this->isCacheable ) {
+			if ( !$pageRecord ) {
+				if ( $this->page ) {
 					throw new RevisionAccessException(
 						'Page {name} not found',
-						[ 'name' => $name ]
+						[ 'name' => "{$this->page}" ]
 					);
+				} else {
+					throw new RevisionAccessException( "No page" );
 				}
 			}
 
-			$revision ??= $page->getLatest();
+			$revision ??= $pageRecord->getLatest();
 
 			if ( is_int( $revision ) ) {
 				$revId = $revision;
@@ -866,10 +903,10 @@ class HtmlOutputRendererHelper implements HtmlOutputHelper {
 				}
 			}
 
-			if ( $page->getId() !== $revision->getPageId() ) {
+			if ( $pageRecord->getId() !== $revision->getPageId() ) {
 				if ( $this->lenientRevHandling ) {
-					$page = $this->pageLookup->getPageById( $revision->getPageId() );
-					if ( !$page ) {
+					$pageRecord = $this->pageLookup->getPageById( $revision->getPageId() );
+					if ( !$pageRecord ) {
 						// This should ideally never trigger!
 						throw new \RuntimeException(
 							"Unexpected NULL page for pageid " . $revision->getPageId() .
@@ -881,24 +918,23 @@ class HtmlOutputRendererHelper implements HtmlOutputHelper {
 				} else {
 					throw new RevisionAccessException(
 						'Revision {revId} does not belong to page {name}',
-						[ 'name' => $page->getDBkey(), 'revId' => $revision->getId() ]
+						[ 'name' => $pageRecord->getDBkey(), 'revId' => $revision->getId() ]
 					);
 				}
 			}
 		}
 
-		$mainSlot = $revision->getSlot( SlotRecord::MAIN );
-		$contentModel = $mainSlot->getModel();
+		$contentModel = $revision->getMainContentModel();
 		if ( $this->parsoidSiteConfig->supportsContentModel( $contentModel ) ) {
 			$this->parserOptions->setUseParsoid();
 		}
 		if ( $this->isCacheable ) {
 			// phan can't tell that we must have used the block above to
-			// resolve $page to a PageRecord if we've made it to this block.
-			'@phan-var PageRecord $page';
+			// resolve $pageRecord to a PageRecord if we've made it to this block.
+			'@phan-var PageRecord $pageRecord';
 			try {
 				$status = $this->parserOutputAccess->getParserOutput(
-					$page, $this->parserOptions, $revision, $flags
+					$pageRecord, $this->parserOptions, $revision, $flags
 				);
 			} catch ( ClientError $e ) {
 				$status = Status::newFatal( 'parsoid-client-error', $e->getMessage() );
@@ -907,8 +943,9 @@ class HtmlOutputRendererHelper implements HtmlOutputHelper {
 			}
 			Assert::invariant( $status->isOK() ? $status->getValue()->getRenderId() !== null : true, "no render id" );
 		} else {
+			'@phan-var RevisionRecord $revision';
 			$status = $this->parseUncacheable(
-				$page,
+				$this->page,
 				$revision,
 				$this->lenientRevHandling
 			);

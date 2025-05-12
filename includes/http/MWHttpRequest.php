@@ -177,9 +177,6 @@ abstract class MWHttpRequest implements LoggerAwareInterface {
 		$this->profileName = $caller;
 	}
 
-	/**
-	 * @param LoggerInterface $logger
-	 */
 	public function setLogger( LoggerInterface $logger ) {
 		$this->logger = $logger;
 	}
@@ -287,15 +284,12 @@ abstract class MWHttpRequest implements LoggerAwareInterface {
 	}
 
 	/**
-	 * Check if the URL can be served by localhost
+	 * Check if the URL can be served by a local endpoint
 	 *
 	 * @param string $url Full url to check
 	 * @return bool
 	 */
 	private static function isLocalURL( $url ) {
-		if ( MW_ENTRY_POINT === 'cli' ) {
-			return false;
-		}
 		$localVirtualHosts = MediaWikiServices::getInstance()->getMainConfig()->get(
 			MainConfigNames::LocalVirtualHosts );
 
@@ -572,8 +566,6 @@ abstract class MWHttpRequest implements LoggerAwareInterface {
 	 * Tells the MWHttpRequest object to use this pre-loaded CookieJar.
 	 *
 	 * To read response cookies from the jar, getCookieJar must be called first.
-	 *
-	 * @param CookieJar $jar
 	 */
 	public function setCookieJar( CookieJar $jar ) {
 		$this->cookieJar = $jar;

@@ -105,6 +105,10 @@ class SpecialRestSandbox extends SpecialPage {
 			return;
 		}
 
+		if ( $out->getLanguage()->getCode() !== 'en' ) {
+			$out->addHTML( Html::noticeBox( $out->msg( 'restsandbox-disclaimer' )->parse(), '' ) );
+		}
+
 		$this->showForm( $apiSpecs );
 
 		if ( !$specUrl ) {
@@ -115,23 +119,31 @@ class SpecialRestSandbox extends SpecialPage {
 		}
 
 		$out->addModules( [
+			'mediawiki.codex.messagebox.styles',
 			'mediawiki.special.restsandbox'
 		] );
 
 		$out->addHTML( Html::openElement( 'div', [ 'id' => 'mw-restsandbox' ] ) );
 
 		// Hidden when JS is available
-		$out->wrapWikiMsg(
-			Html::element(
-				'div',
-				[ 'class' => [ 'mw-restsandbox-client-nojs', 'error', ], ],
-				"\n$1\n"
-			),
-			'restsandbox-jsonly'
-		);
+		$out->addHTML( Html::errorBox(
+			$out->msg( 'restsandbox-jsonly' )->parse(),
+			'',
+			'mw-restsandbox-client-nojs'
+		) );
 
 		// To be replaced by Swagger UI.
-		$out->addElement( 'div', [ 'id' => 'mw-restsandbox-swagger-ui' ] );
+		$out->addElement( 'div', [
+			'id' => 'mw-restsandbox-swagger-ui',
+			// Force direction to "LTR" with swagger-ui.
+			// Since the swagger content is not internationalized, the information is always in English.
+			// We have to force the direction to "LTR" to avoid the content (specifically json strings)
+			// from being mangled.
+			'dir' => 'ltr',
+			'lang' => 'en',
+			// For dark mode compatibility
+			'class' => 'skin-invert'
+		] );
 
 		$out->addHTML( Html::closeElement( 'div' ) ); // #mw-restsandbox
 	}

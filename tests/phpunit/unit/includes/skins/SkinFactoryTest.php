@@ -1,9 +1,13 @@
 <?php
 
+use MediaWiki\Skin\Skin;
+use MediaWiki\Skin\SkinException;
+use MediaWiki\Skin\SkinFactory;
+use MediaWiki\Skin\SkinFallback;
 use MediaWiki\Tests\Unit\DummyServicesTrait;
 
 /**
- * @covers \SkinFactory
+ * @covers \MediaWiki\Skin\SkinFactory
  */
 class SkinFactoryTest extends \MediaWikiUnitTestCase {
 	use DummyServicesTrait;
@@ -118,7 +122,7 @@ class SkinFactoryTest extends \MediaWikiUnitTestCase {
 	}
 
 	public function testGetSkinNames() {
-		$this->expectDeprecationAndContinue( '/Use of SkinFactory::getSkinNames was deprecated in MediaWiki 1\.37/' );
+		$this->expectDeprecationAndContinue( '/SkinFactory::getSkinNames was deprecated in MediaWiki 1\.37/' );
 
 		$factory = $this->createSkinFactory();
 		$factory->register( 'skin1', 'Skin1', [] );

@@ -53,18 +53,21 @@
 	mw.widgets.NamespaceInputWidget.static.getNamespaceDropdownOptions = function ( config ) {
 		const exclude = config.exclude || [],
 			include = config.include || null,
-			mainNamespace = mw.config.get( 'wgNamespaceIds' )[ '' ];
+			mainNamespace = mw.config.get( 'wgNamespaceIds' )[ '' ],
+			widgetData = require( './data.json' );
 
-		const namespaces = config.userLang ?
-			require( './data.json' ).formattedNamespaces :
+		// Use namespace names in the user language also when it's a variant of the content language.
+		// This is to keep the behaviour more consistent with the no-js version.
+		const namespaces = config.userLang || widgetData.isContLangVariant ?
+			widgetData.formattedNamespaces :
 			mw.config.get( 'wgFormattedNamespaces' );
 
 		// eslint-disable-next-line no-jquery/no-map-util
 		const options = $.map( namespaces, ( name, ns ) => {
 			if (
 				ns < mainNamespace ||
-				exclude.indexOf( Number( ns ) ) !== -1 ||
-				( Array.isArray( include ) && include.indexOf( Number( ns ) ) === -1 )
+				exclude.includes( Number( ns ) ) ||
+				( Array.isArray( include ) && !include.includes( Number( ns ) ) )
 			) {
 				return null; // skip
 			}
